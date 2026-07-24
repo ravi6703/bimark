@@ -1,0 +1,39 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: bimark
+      POSTGRES_PASSWORD: bimark
+      POSTGRES_DB: bimark
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bimark"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://bimark:bimark@db:5432/bimark
+      NODE_ENV: production
+      PORT: "3000"
+      # Pass the rest through from your shell/.env (LLM key, Telegram, publisher…).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      PUBLISH_PROVIDER: ${PUBLISH_PROVIDER:-mock}
+      EMBED_PROVIDER: ${EMBED_PROVIDER:-mock}
+    ports:
+      - "3000:3000"
+    # Run migrate + seed once, then start the server.
+    command: sh -c "npm run migrate && npm run seed && npm start"
+
+volumes:
+  pgdata:

@@ -1,0 +1,127 @@
+import { config } from "../config.js";
+import { logger } from "../logger.js";
+import { repurpose } from "../agents/repurpose.js";
+import { review } from "../agents/reviewer.js";
+import { DEFAULT_VOICE_GUIDE } from "../agents/prompts.js";
+import { brands, drafts, ownedAssets, pillars, topics } from "../db/repositories/index.js";
+import { retrieve } from "../rag/retrieve.js";
+import { getTelegram } from "../telegram/client.js";
+import { draftPreviewMessage } from "../telegram/messages.js";
+import type { Draft, ReviewerResult, RetrievedChunk, Topic } from "../types.js";
+
+/**
+ * WF-4 · Repurpose & Review → Draft (§16). Called by WF-2 (pitch pick) and WF-3
+ * (manual intake). Same gate for both paths — no fast lane (§4.2).
+ *
+ *   retrieve owned material → draft → brand-safety review (loop on flag) →
+ *   persist draft → Telegram approval preview.
+ */
+export async function runRepurposeReview(topicId: number): Promise<Draft> {
+  const topic = await topics.get(topicId);
+  if (!topic) throw new Error(`WF-4: topic ${topicId} not found`);
+
+  const brand = await brands.get(topic.brand_id);
+  const voiceGuide = brand?.voice_guide ?? DEFAULT_VOICE_GUIDE;
+  const bannedTopics = brand?.banned_topics ?? [];
+  const pillarName = await resolvePillarName(topic);
+
+  await topics.setStatus(topic.id, "drafting");
+
+  // Step 1 — gather grounding chunks (§16 WF-4.1).
+  const { chunks, lowSource } = await gatherChunks(topic);
+
+  // Step 2 — repurpose into a draft.
+  let draftOut = await repurpose({
+    voiceGuide,
+    angle: topic.angle ?? "",
+    pillar: pillarName,
+    chunks,
+    mustSay: topic.must_say,
+    format: topic.format_hint,
+  });
+
+  // Step 3 & 4 — brand-safety review loop; escalate if persistently flagged.
+  let reviewer: ReviewerResult | null = null;
+  let retries = 0;
+  const maxRetries = config.quality.maxReviewRetries;
+  while (retries <= maxRetries) {
+    reviewer = await review({
+      draft: draftOut.body,
+      claimsUsed: draftOut.claims_used,
+      chunks,
+      bannedTopics,
+      voiceGuide,
+    });
+    if (reviewer.verdict === "pass") break;
+
+    retries++;
+    if (retries > maxRetries) {
+      logger.warn({ topicId, flags: reviewer.flags }, "WF-4: escalating persistently-flagged draft");
+      break; // escalate to the human with the flag reason attached
+    }
+    logger.info({ topicId, retry: retries, flags: reviewer.flags }, "WF-4: reviewer flagged, rewriting");
+    draftOut = await repurpose({
+      voiceGuide,
+      angle: `${topic.angle ?? ""} (revise to fix: ${reviewer.notes})`,
+      pillar: pillarName,
+      chunks,
+      mustSay: topic.must_say,
+      format: topic.format_hint,
+    });
+  }
+
+  // Step 5 — persist the draft.
+  const draft = await drafts.create({
+    topic_id: topic.id,
+    platform: topic.platform,
+    body: draftOut.body,
+    variants: draftOut.variants,
+    claims_used: draftOut.claims_used,
+    low_source: lowSource,
+    model_used: draftOut.modelUsed,
+    prompt_version: draftOut.promptVersion,
+    reviewer_result: reviewer,
+    review_retries: retries,
+    status: "pending_approval",
+  });
+  await topics.setStatus(topic.id, "drafted");
+
+  // Step 6 — Telegram approval preview (§9 gate).
+  const { text, buttons } = draftPreviewMessage(draft);
+  await getTelegram().sendMessage({ text, buttons });
+
+  logger.info({ draftId: draft.id, topicId, lowSource, retries }, "WF-4: draft ready for approval");
+  return draft;
+}
+
+async function resolvePillarName(topic: Topic): Promise<string> {
+  if (topic.pillar_id == null) return "";
+  const list = await pillars.listActive(topic.brand_id);
+  return list.find((p) => p.id === topic.pillar_id)?.name ?? "";
+}
+
+/**
+ * Build grounding chunks. An explicitly chosen owned asset anchors the draft;
+ * otherwise we semantic-search and honour the similarity threshold (§4.2).
+ */
+async function gatherChunks(
+  topic: Topic,
+): Promise<{ chunks: RetrievedChunk[]; lowSource: boolean }> {
+  const query = [topic.angle, topic.why_now].filter(Boolean).join(". ");
+
+  if (topic.source_asset_id != null) {
+    const asset = await ownedAssets.get(topic.source_asset_id);
+    if (asset) {
+      await ownedAssets.markUsed(asset.id);
+      const anchor: RetrievedChunk = { ...asset, similarity: 1 };
+      // Supplement with related chunks for richer context (best-effort).
+      const extra = await retrieve(topic.brand_id, query || asset.title || "").catch(() => null);
+      const more = (extra?.chunks ?? []).filter((c) => c.id !== asset.id).slice(0, 3);
+      return { chunks: [anchor, ...more], lowSource: false };
+    }
+  }
+
+  const result = await retrieve(topic.brand_id, query || topic.angle || "");
+  for (const c of result.chunks.slice(0, 1)) await ownedAssets.markUsed(c.id);
+  return { chunks: result.chunks, lowSource: result.lowSource };
+}
