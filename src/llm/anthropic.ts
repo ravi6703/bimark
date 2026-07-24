@@ -22,7 +22,12 @@ export class AnthropicProvider implements LlmProvider {
     const res = await this.client.messages.create({
       model,
       max_tokens: opts.maxTokens ?? 1024,
-      temperature: opts.temperature ?? (opts.task === "review" ? 0 : 0.7),
+      // `temperature` is omitted rather than defaulted: some model versions
+      // (observed on the strong tier) reject the request entirely with
+      // "temperature is deprecated for this model" if it's present at all,
+      // even at a normal value. Only forward it when a caller explicitly
+      // asks for one, and accept that it may still be rejected on some models.
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(system ? { system } : {}),
       messages: opts.messages.map((m) => ({ role: m.role, content: m.content })),
     });

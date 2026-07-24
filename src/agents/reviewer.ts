@@ -33,7 +33,8 @@ export async function review(
     system,
     messages: [{ role: "user", content: user }],
     json: true,
-    temperature: 0,
+    // No explicit temperature: some strong-tier model versions reject the
+    // request outright if it's present at all (see src/llm/anthropic.ts).
     maxTokens: 512,
     mockResult: JSON.stringify(heuristicReview(input)),
   });
