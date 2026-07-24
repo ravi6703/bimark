@@ -6,6 +6,7 @@ import { ingestDir } from "./rag/ingest.js";
 import { runMorningPitch } from "./workflows/wf1_morningPitch.js";
 import { runAnalyticsPoller } from "./workflows/wf6_analyticsPoller.js";
 import { runEditorialMemo, runSovSnapshot } from "./workflows/wf7_sovMemo.js";
+import { currentPeriod } from "./util/period.js";
 
 /**
  * Cron scheduler (§16). Registers the four scheduled workflows. Each task
@@ -82,12 +83,4 @@ export function startScheduler(): cron.ScheduledTask[] {
 
   logger.info({ tasks: tasks.length, tz }, "scheduler started");
   return tasks;
-}
-
-/** Previous-ish month bucket in YYYY-MM (memo runs on the 1st, for the month just past). */
-export function currentPeriod(now = new Date()): string {
-  const d = new Date(now.getTime());
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() - 1);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }

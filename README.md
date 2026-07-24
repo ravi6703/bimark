@@ -38,6 +38,19 @@ Everything runs **offline with zero spend** by default: no `ANTHROPIC_API_KEY`
 token → messages are logged (dry-run). Add credentials to light up each real
 integration. This is what makes the §7 quality bar measurable from day one.
 
+## Deployment targets
+
+The same `src/` business logic runs two ways:
+
+- **Docker/VM** (`docker-compose.yml`) — a long-running Express server +
+  `node-cron` scheduler. This is the default and matches the PRD's "always-on
+  service" shape most closely.
+- **Vercel** (`api/*.ts` + `vercel.json`) — the HTTP routes as individual
+  serverless functions, with the scheduled workflows (WF-1/6/7) run by Vercel
+  Cron Jobs instead of `node-cron`, against an external Postgres+pgvector
+  (e.g. Supabase). See [`docs/VERCEL.md`](docs/VERCEL.md) for the full setup —
+  applying the schema, env vars, and the Hobby-plan cron-frequency caveat.
+
 ## Quick start
 
 ```bash
@@ -121,11 +134,13 @@ src/agents/          §17 prompts + Daily Pitch, Repurposing, Reviewer, Trend Mo
 src/telegram/        approval-gate client + message/callback encoding
 src/publish/         Buffer / Ayrshare / mock adapters (§8)
 src/workflows/       WF-1 … WF-7 (§16)
-src/server.ts        manual-intake + telegram webhooks, /health, /metrics/quality
-src/scheduler.ts     cron for WF-1/6/7 + nightly ingest refresh
+src/server.ts        Express app (Docker/VM): manual-intake + telegram webhooks, /health, /metrics/quality
+src/scheduler.ts     node-cron for WF-1/6/7 + nightly ingest refresh (Docker/VM only)
+api/                 Vercel serverless functions — same routes/cron jobs, see docs/VERCEL.md
 test/                offline unit tests + DB-gated integration test
-docs/                ARCHITECTURE.md, n8n-mapping.md
+docs/                ARCHITECTURE.md, n8n-mapping.md, VERCEL.md, supabase-migration.sql
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design rationale and
-[`docs/n8n-mapping.md`](docs/n8n-mapping.md) for the module ↔ n8n-workflow map.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design rationale,
+[`docs/n8n-mapping.md`](docs/n8n-mapping.md) for the module ↔ n8n-workflow map,
+and [`docs/VERCEL.md`](docs/VERCEL.md) for the serverless deployment path.

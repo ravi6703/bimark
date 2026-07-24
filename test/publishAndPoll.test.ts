@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockPublisher } from "../src/publish/mock.js";
 import { shouldPoll } from "../src/workflows/wf6_analyticsPoller.js";
-import { currentPeriod } from "../src/scheduler.js";
+import { currentPeriod } from "../src/util/period.js";
 
 describe("MockPublisher", () => {
   const pub = new MockPublisher();
