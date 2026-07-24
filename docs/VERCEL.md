@@ -1,5 +1,8 @@
 # Deploying to Vercel
 
+**Live deployment:** https://bimark-zeta.vercel.app (mock mode — no `DATABASE_URL`
+set yet; see steps 2–3 below to wire the real Supabase DB and go live).
+
 The PRD's design (§8: buy the plumbing, build only the intelligence) is
 implemented as a long-running Node service by default — `src/index.ts` runs an
 Express server plus a `node-cron` scheduler, which is what `docker-compose.yml`
