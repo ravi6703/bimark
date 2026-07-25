@@ -19,6 +19,8 @@ export function MetricsView() {
   if (error) return <div className="error-box">{error}</div>;
   if (!stats) return <div className="spinner-text">Loading…</div>;
 
+  const onCadence = stats.postsLast7Days >= stats.postsPerWeekMin;
+
   return (
     <div>
       <p className="pillar-tag" style={{ marginBottom: 16 }}>
@@ -26,6 +28,17 @@ export function MetricsView() {
         {pct(stats.target)} first-pass approval.
       </p>
       <div className="stat-grid">
+        <div className="stat">
+          <div
+            className="value"
+            style={{ color: onCadence ? "var(--green)" : "var(--amber)" }}
+          >
+            {stats.postsLast7Days}
+          </div>
+          <div className="label">
+            Posts published, last 7 days (target {stats.postsPerWeekMin}–{stats.postsPerWeekMax}/week)
+          </div>
+        </div>
         <div className="stat">
           <div
             className="value"

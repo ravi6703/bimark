@@ -116,6 +116,10 @@ export const config = {
     firstPassApprovalTarget: num("FIRST_PASS_APPROVAL_TARGET", 0.7),
     // Max reviewer round-trips before escalating a persistently flagged draft (WF-4.4).
     maxReviewRetries: int("MAX_REVIEW_RETRIES", 2),
+    // The PRD's own cadence target (README: "2-4 posts a week, not one a day") —
+    // instrumented in the dashboard (audit Phase 1) instead of just asserted in docs.
+    postsPerWeekMin: int("POSTS_PER_WEEK_MIN", 2),
+    postsPerWeekMax: int("POSTS_PER_WEEK_MAX", 4),
   },
 
   admin: {

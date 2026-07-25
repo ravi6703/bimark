@@ -48,6 +48,20 @@ export const brands = {
     );
     return rows[0]!;
   },
+  async update(
+    id: number,
+    b: { voice_guide?: string; visual_notes?: string; banned_topics?: string[] },
+  ): Promise<Brand | null> {
+    const { rows } = await query<Brand>(
+      `UPDATE brands SET
+         voice_guide = COALESCE($2, voice_guide),
+         visual_notes = COALESCE($3, visual_notes),
+         banned_topics = COALESCE($4, banned_topics)
+       WHERE id = $1 RETURNING *`,
+      [id, b.voice_guide ?? null, b.visual_notes ?? null, b.banned_topics ?? null],
+    );
+    return rows[0] ?? null;
+  },
 };
 
 // ── Pillars ─────────────────────────────────────────────────────────────────
@@ -58,6 +72,27 @@ export const pillars = {
       [brandId],
     );
     return rows;
+  },
+  /** Includes inactive pillars — for the management UI, not the pitch/manual-intake pickers. */
+  async listAll(brandId: number): Promise<Pillar[]> {
+    const { rows } = await query<Pillar>("SELECT * FROM pillars WHERE brand_id = $1 ORDER BY id", [
+      brandId,
+    ]);
+    return rows;
+  },
+  async update(
+    id: number,
+    p: { name?: string; description?: string | null; active?: boolean },
+  ): Promise<Pillar | null> {
+    const { rows } = await query<Pillar>(
+      `UPDATE pillars SET
+         name = COALESCE($2, name),
+         description = COALESCE($3, description),
+         active = COALESCE($4, active)
+       WHERE id = $1 RETURNING *`,
+      [id, p.name ?? null, p.description ?? null, p.active ?? null],
+    );
+    return rows[0] ?? null;
   },
   async create(p: {
     brand_id: number;
@@ -461,6 +496,14 @@ export const posts = {
     );
     return rows;
   },
+  /** Cadence rollup (audit Phase 1) — how many posts actually went out since `since`. */
+  async countPublishedSince(since: Date): Promise<number> {
+    const { rows } = await query<{ n: string }>(
+      "SELECT count(*)::int AS n FROM posts WHERE published_at >= $1",
+      [since],
+    );
+    return Number(rows[0]?.n ?? 0);
+  },
 };
 
 // ── Metrics ────────────────────────────────────────────────────────────────────
@@ -507,6 +550,14 @@ export const insights = {
       i.period,
       i.memo,
     ]);
+  },
+  /** Dashboard view (audit Phase 1) — the editorial memo previously reached only Telegram. */
+  async list(brandId: number, limit = 24): Promise<{ id: number; period: string; memo: string; created_at: Date }[]> {
+    const { rows } = await query<{ id: number; period: string; memo: string; created_at: Date }>(
+      "SELECT id, period, memo, created_at FROM insights WHERE brand_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [brandId, limit],
+    );
+    return rows;
   },
 };
 

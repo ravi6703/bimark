@@ -6,6 +6,8 @@ import { NewTopicForm } from "./components/NewTopicForm";
 import { PillarsView } from "./components/PillarsView";
 import { MetricsView } from "./components/MetricsView";
 import { TeamView } from "./components/TeamView";
+import { TopicsView } from "./components/TopicsView";
+import { InsightsView } from "./components/InsightsView";
 
 const TABS = [
   {
@@ -21,6 +23,20 @@ const TABS = [
     icon: "✍️",
     title: "New topic",
     subtitle: "Pick platforms, add context, and generate drafts for review.",
+  },
+  {
+    key: "topics",
+    label: "Topics",
+    icon: "💡",
+    title: "Topics",
+    subtitle: "Every topic the pipeline has suggested or been given, AI and manual alike.",
+  },
+  {
+    key: "insights",
+    label: "Insights",
+    icon: "🗒️",
+    title: "Insights",
+    subtitle: "The monthly editorial memo — what landed, what didn't, and why.",
   },
   {
     key: "pillars",
@@ -137,6 +153,8 @@ export function App() {
 
         {tab === "queue" && <DraftQueue onDraftsChanged={refreshPendingCount} />}
         {tab === "new" && <NewTopicForm />}
+        {tab === "topics" && <TopicsView />}
+        {tab === "insights" && <InsightsView />}
         {tab === "pillars" && <PillarsView />}
         {tab === "metrics" && <MetricsView />}
         {tab === "team" && <TeamView />}

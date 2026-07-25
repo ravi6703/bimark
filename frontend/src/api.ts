@@ -97,6 +97,15 @@ export interface QualityStats {
   meanEditDistance: number | null;
   sample: number;
   target: number;
+  postsLast7Days: number;
+  postsPerWeekMin: number;
+  postsPerWeekMax: number;
+}
+export interface Insight {
+  id: number;
+  period: string;
+  memo: string;
+  created_at: string;
 }
 
 // ── Per-platform guidance (§20) ──────────────────────────────────────────────
@@ -152,9 +161,29 @@ export const api = {
     return topics;
   },
 
-  async listPillars(): Promise<Pillar[]> {
-    const { pillars } = await request<{ pillars: Pillar[] }>("/pillars");
+  async listPillars(opts: { all?: boolean } = {}): Promise<Pillar[]> {
+    const qs = opts.all ? "?all=true" : "";
+    const { pillars } = await request<{ pillars: Pillar[] }>(`/pillars${qs}`);
     return pillars;
+  },
+
+  async createPillar(input: { name: string; description?: string }): Promise<Pillar> {
+    const { pillar } = await request<{ pillar: Pillar }>("/pillars", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return pillar;
+  },
+
+  async updatePillar(
+    id: number,
+    input: { name?: string; description?: string; active?: boolean },
+  ): Promise<Pillar> {
+    const { pillar } = await request<{ pillar: Pillar }>(`/pillars/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+    return pillar;
   },
 
   async getBrand(): Promise<Brand> {
@@ -162,8 +191,28 @@ export const api = {
     return brand;
   },
 
+  async updateBrand(input: {
+    voice_guide?: string;
+    visual_notes?: string;
+    banned_topics?: string[];
+  }): Promise<Brand> {
+    const { brand } = await request<{ brand: Brand }>("/brand", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+    return brand;
+  },
+
   async getQuality(): Promise<QualityStats> {
     return request<QualityStats>("/metrics/quality");
+  },
+
+  async listInsights(): Promise<{ insights: Insight[]; sovConfigured: boolean }> {
+    return request<{ insights: Insight[]; sovConfigured: boolean }>("/insights");
+  },
+
+  async regenerateImage(draftId: number) {
+    return request(`/drafts/${draftId}/regenerate-image`, { method: "POST" });
   },
 
   async approveDraft(

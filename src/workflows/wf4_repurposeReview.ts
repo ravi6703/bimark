@@ -163,6 +163,34 @@ async function attachGeneratedImage(
   }
 }
 
+/**
+ * Regenerate the attached image for an Instagram draft (audit Phase 1 quick
+ * win — previously a failed generation was a dead end short of rejecting the
+ * whole draft, since the only recourse was passing mediaUrls manually).
+ */
+export async function regenerateDraftImage(draftId: number): Promise<Draft> {
+  const draft = await drafts.get(draftId);
+  if (!draft) throw new Error(`regenerateDraftImage: draft ${draftId} not found`);
+  if (draft.platform !== "instagram") {
+    throw new Error("regenerateDraftImage: only Instagram drafts carry a generated image");
+  }
+  const topic = await topics.get(draft.topic_id);
+  if (!topic) throw new Error(`regenerateDraftImage: topic for draft ${draftId} not found`);
+  const brand = await brands.get(topic.brand_id);
+  const pillarName = await resolvePillarName(topic);
+  const visualStyle = (topic.platform_extra as InstagramExtra | null)?.visualStyle;
+  const visualNotes =
+    [brand?.visual_notes, visualStyle ? `Visual style: ${visualStyle}.` : null]
+      .filter(Boolean)
+      .join(" ") || null;
+
+  await attachGeneratedImage(draft, topic.angle ?? "", pillarName, visualNotes);
+  if (draft.media_asset_id == null) {
+    throw new Error("Image generation failed again — check the image provider's credentials.");
+  }
+  return draft;
+}
+
 async function resolvePillarName(topic: Topic): Promise<string> {
   if (topic.pillar_id == null) return "";
   const list = await pillars.listActive(topic.brand_id);

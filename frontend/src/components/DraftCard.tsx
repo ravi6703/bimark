@@ -15,10 +15,30 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
   const [scheduledAt, setScheduledAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [showSources, setShowSources] = useState(false);
 
   const needsImage = draft.platform === "instagram";
   const imageFailed = needsImage && draft.media_asset_id == null;
   const held = draft.status === "approved_hold";
+
+  function useVariant(text: string) {
+    setEditedText(text);
+    setEditing(true);
+  }
+
+  async function handleRegenerateImage() {
+    setError(null);
+    setRegenerating(true);
+    try {
+      await api.regenerateImage(draft.id);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Regenerate failed");
+    } finally {
+      setRegenerating(false);
+    }
+  }
 
   async function handleApprove() {
     setError(null);
@@ -108,15 +128,54 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
         </div>
       )}
 
+      {draft.variants != null && draft.variants.length > 0 && (
+        <div className="variants-box">
+          <div className="variants-label">Alternate hooks the AI drafted</div>
+          {draft.variants.map((v, i) => (
+            <div className="variant-row" key={i}>
+              <span>{v}</span>
+              <button className="btn" type="button" onClick={() => useVariant(v)} disabled={busy}>
+                Use this
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {draft.claims_used != null && draft.claims_used.length > 0 && (
+        <details className="sources-box" open={showSources} onToggle={(e) => setShowSources(e.currentTarget.open)}>
+          <summary>Sources this draft cites ({draft.claims_used.length})</summary>
+          <ul>
+            {draft.claims_used.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       {needsImage && draft.media_asset_id != null && (
-        <img
-          className="draft-image"
-          src={`/api/media/${draft.media_asset_id}`}
-          alt="AI-generated visual for this post"
-        />
+        <>
+          <img
+            className="draft-image"
+            src={`/api/media/${draft.media_asset_id}`}
+            alt="AI-generated visual for this post"
+          />
+          <div className="row" style={{ marginTop: -4 }}>
+            <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating || busy}>
+              🔄 {regenerating ? "Regenerating…" : "Regenerate image"}
+            </button>
+          </div>
+        </>
       )}
       {imageFailed && (
-        <div className="meta-note flag">🖼️ Image generation failed — nothing to post yet.</div>
+        <>
+          <div className="meta-note flag">🖼️ Image generation failed — nothing to post yet.</div>
+          <div className="row" style={{ marginTop: -4 }}>
+            <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating}>
+              🔄 {regenerating ? "Trying again…" : "Try generating again"}
+            </button>
+          </div>
+        </>
       )}
 
       {error && <div className="error-box" style={{ marginTop: 10 }}>{error}</div>}

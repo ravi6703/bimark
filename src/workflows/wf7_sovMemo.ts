@@ -24,6 +24,14 @@ let sovSource: SovSource = new NullSovSource();
 export function setSovSource(s: SovSource): void {
   sovSource = s;
 }
+/**
+ * Audit Phase 1: SOV was silently reporting a permanent 0% as if it were real
+ * data whenever no listening source was wired up. Exposed here so the memo
+ * text and the dashboard can both say "not configured" instead of a bare 0%.
+ */
+export function isSovConfigured(): boolean {
+  return !(sovSource instanceof NullSovSource);
+}
 
 /**
  * WF-7a · SOV snapshot (§16 weekly / §19). For each pillar, score BI vs each
@@ -106,6 +114,10 @@ async function summarizeSkipped(brandId: number, period: string): Promise<string
 }
 
 async function summarizeSov(brandId: number): Promise<string> {
+  if (!isSovConfigured()) {
+    return "SOV tracking not yet configured — connect a social-listening source " +
+      "(see setSovSource()) to see real competitive trend data here.";
+  }
   const { rows } = await query<{ sov_pct: string; captured_at: Date }>(
     `SELECT sov_pct, captured_at FROM sov_snapshots
       WHERE brand_id = $1 ORDER BY captured_at DESC LIMIT 4`,
