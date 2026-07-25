@@ -101,6 +101,12 @@ body {
   margin-bottom: 14px;
 }
 
+.platform-fields {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  margin-top: 10px;
+}
+
 .draft-image {
   display: block;
   width: 100%;

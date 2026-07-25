@@ -99,6 +99,17 @@ export interface QualityStats {
   target: number;
 }
 
+// ── Per-platform guidance (§20) ──────────────────────────────────────────────
+export interface PlatformDetails {
+  linkedin?: { audience?: string; cta?: string };
+  x?: { angleStyle?: "hot-take" | "informative" | "question" };
+  instagram?: { visualStyle?: "photography" | "illustration" | "infographic" };
+}
+export interface ClarifyQuestion {
+  platform: string;
+  question: string;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────
 export const api = {
   async login(password: string): Promise<string> {
@@ -157,6 +168,7 @@ export const api = {
     format?: string;
     must_say?: string;
     why_now?: string;
+    platformDetails?: PlatformDetails;
   }): Promise<{ platform: string; topicId: number; draftId: number }[]> {
     const { results } = await request<{
       results: { platform: string; topicId: number; draftId: number }[];
@@ -165,5 +177,17 @@ export const api = {
       body: JSON.stringify({ brand_id: 1, ...input }),
     });
     return results;
+  },
+
+  async clarifyTopic(input: {
+    topic: string;
+    platforms: string[];
+    must_say?: string;
+    why_now?: string;
+  }): Promise<{ sufficient: boolean; questions: ClarifyQuestion[] }> {
+    return request("/topics/clarify", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   },
 };

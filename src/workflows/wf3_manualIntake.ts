@@ -18,6 +18,15 @@ import type { Draft } from "../types.js";
  */
 const PLATFORM = z.enum(["linkedin", "x", "instagram"]);
 
+/** Structured per-platform guidance (§20) — mirrors src/types.ts#PlatformExtra. */
+const platformDetailsSchema = z.object({
+  linkedin: z.object({ audience: z.string().optional(), cta: z.string().optional() }).optional(),
+  x: z.object({ angleStyle: z.enum(["hot-take", "informative", "question"]).optional() }).optional(),
+  instagram: z
+    .object({ visualStyle: z.enum(["photography", "illustration", "infographic"]).optional() })
+    .optional(),
+});
+
 export const manualIntakeSchema = z.object({
   brand_id: z.number().int().positive(),
   topic: z.string().min(3), // the topic line, e.g. "the skills gap in tier-2 colleges"
@@ -28,6 +37,7 @@ export const manualIntakeSchema = z.object({
   format: z.string().optional(), // e.g. 'carousel' | 'text_pov'
   must_say: z.string().optional(),
   why_now: z.string().optional(),
+  platformDetails: platformDetailsSchema.optional(),
 });
 
 export type ManualIntakeInput = z.infer<typeof manualIntakeSchema>;
@@ -60,6 +70,7 @@ export async function handleManualIntake(raw: unknown): Promise<ManualIntakeResu
       platform,
       format_hint: input.format ?? null,
       must_say: input.must_say ?? null,
+      platform_extra: input.platformDetails?.[platform] ?? null,
       priority: 10, // outrank AI-suggested topics (§4.2)
       status: "picked",
     });

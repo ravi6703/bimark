@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, type Pillar } from "../api";
+import { api, ApiError, type ClarifyQuestion, type Pillar, type PlatformDetails } from "../api";
 
 const PLATFORMS = [
   { key: "linkedin", label: "LinkedIn" },
@@ -14,6 +14,19 @@ export function NewTopicForm() {
   const [platforms, setPlatforms] = useState<string[]>(["linkedin"]);
   const [mustSay, setMustSay] = useState("");
   const [whyNow, setWhyNow] = useState("");
+
+  // Per-platform fields (§20) — only the checked platform's fields matter.
+  const [linkedinAudience, setLinkedinAudience] = useState("");
+  const [linkedinCta, setLinkedinCta] = useState("");
+  const [xAngleStyle, setXAngleStyle] = useState<"" | "hot-take" | "informative" | "question">("");
+  const [instagramVisualStyle, setInstagramVisualStyle] = useState<
+    "" | "photography" | "illustration" | "infographic"
+  >("");
+
+  // Clarify step (§20) — the AI asks 1-2 questions when the topic is thin.
+  const [questions, setQuestions] = useState<ClarifyQuestion[] | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -23,9 +36,59 @@ export function NewTopicForm() {
   }, []);
 
   function togglePlatform(key: string) {
-    setPlatforms((prev) =>
-      prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key],
-    );
+    setPlatforms((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
+  }
+
+  function buildPlatformDetails(): PlatformDetails {
+    const details: PlatformDetails = {};
+    if (platforms.includes("linkedin") && (linkedinAudience || linkedinCta)) {
+      details.linkedin = {
+        audience: linkedinAudience || undefined,
+        cta: linkedinCta || undefined,
+      };
+    }
+    if (platforms.includes("x") && xAngleStyle) {
+      details.x = { angleStyle: xAngleStyle };
+    }
+    if (platforms.includes("instagram") && instagramVisualStyle) {
+      details.instagram = { visualStyle: instagramVisualStyle };
+    }
+    return details;
+  }
+
+  function resetForm() {
+    setTopic("");
+    setMustSay("");
+    setWhyNow("");
+    setLinkedinAudience("");
+    setLinkedinCta("");
+    setXAngleStyle("");
+    setInstagramVisualStyle("");
+    setQuestions(null);
+    setAnswers({});
+  }
+
+  async function generate(extraMustSay: string) {
+    setSubmitting(true);
+    try {
+      const results = await api.createTopic({
+        topic: topic.trim(),
+        pillar: pillar || undefined,
+        platforms,
+        must_say: [mustSay, extraMustSay].filter(Boolean).join(" ") || undefined,
+        why_now: whyNow || undefined,
+        platformDetails: buildPlatformDetails(),
+      });
+      setSuccess(
+        `Queued ${results.length} draft${results.length > 1 ? "s" : ""} for review: ` +
+          results.map((r) => r.platform).join(", "),
+      );
+      resetForm();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to submit");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -42,28 +105,73 @@ export function NewTopicForm() {
     }
     setSubmitting(true);
     try {
-      const results = await api.createTopic({
+      const clarify = await api.clarifyTopic({
         topic: topic.trim(),
-        pillar: pillar || undefined,
         platforms,
         must_say: mustSay || undefined,
         why_now: whyNow || undefined,
       });
-      setSuccess(
-        `Queued ${results.length} draft${results.length > 1 ? "s" : ""} for review: ` +
-          results.map((r) => r.platform).join(", "),
-      );
-      setTopic("");
-      setMustSay("");
-      setWhyNow("");
+      if (clarify.sufficient) {
+        await generate("");
+      } else {
+        setQuestions(clarify.questions);
+        setSubmitting(false);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to submit");
-    } finally {
       setSubmitting(false);
     }
   }
 
+  async function handleAnswerSubmit(e: FormEvent) {
+    e.preventDefault();
+    const extra = (questions ?? [])
+      .map((q, i) => (answers[i]?.trim() ? `${q.question} ${answers[i]!.trim()}` : ""))
+      .filter(Boolean)
+      .join(" ");
+    await generate(extra);
+  }
+
   const includesInstagram = platforms.includes("instagram");
+
+  if (questions) {
+    return (
+      <form className="card" onSubmit={handleAnswerSubmit}>
+        <p className="pillar-tag" style={{ marginBottom: 10 }}>
+          A couple of quick questions before drafting — this keeps the post specific instead of generic.
+        </p>
+        {questions.map((q, i) => (
+          <div key={i}>
+            <label htmlFor={`q-${i}`}>
+              [{q.platform}] {q.question}
+            </label>
+            <input
+              id={`q-${i}`}
+              type="text"
+              value={answers[i] ?? ""}
+              onChange={(e) => setAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
+            />
+          </div>
+        ))}
+
+        {error && <div className="error-box" style={{ marginTop: 14 }}>{error}</div>}
+
+        <div className="row">
+          <button className="btn primary" type="submit" disabled={submitting}>
+            {submitting ? "Generating…" : "Generate draft(s)"}
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={submitting}
+            onClick={() => generate("")}
+          >
+            Skip — generate anyway
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <form className="card" onSubmit={handleSubmit}>
@@ -80,9 +188,60 @@ export function NewTopicForm() {
           </label>
         ))}
       </div>
+
+      {platforms.includes("linkedin") && (
+        <div className="platform-fields">
+          <label htmlFor="li-audience">LinkedIn — target audience (optional)</label>
+          <input
+            id="li-audience"
+            type="text"
+            value={linkedinAudience}
+            onChange={(e) => setLinkedinAudience(e.target.value)}
+            placeholder="e.g. senior HR leaders, placement officers"
+          />
+          <label htmlFor="li-cta">LinkedIn — call to action (optional)</label>
+          <input
+            id="li-cta"
+            type="text"
+            value={linkedinCta}
+            onChange={(e) => setLinkedinCta(e.target.value)}
+            placeholder="e.g. ask readers to share their view"
+          />
+        </div>
+      )}
+
+      {platforms.includes("x") && (
+        <div className="platform-fields">
+          <label htmlFor="x-angle">X — angle style (optional)</label>
+          <select
+            id="x-angle"
+            value={xAngleStyle}
+            onChange={(e) => setXAngleStyle(e.target.value as typeof xAngleStyle)}
+          >
+            <option value="">Let the system pick</option>
+            <option value="hot-take">Hot take — provocative, opinionated</option>
+            <option value="informative">Informative — straight insight</option>
+            <option value="question">Question — put it to the audience</option>
+          </select>
+        </div>
+      )}
+
       {includesInstagram && (
-        <div className="pillar-tag" style={{ marginTop: 6 }}>
-          🖼️ Instagram drafts get an AI-generated image attached automatically — no manual upload.
+        <div className="platform-fields">
+          <label htmlFor="ig-visual">Instagram — visual style (optional)</label>
+          <select
+            id="ig-visual"
+            value={instagramVisualStyle}
+            onChange={(e) => setInstagramVisualStyle(e.target.value as typeof instagramVisualStyle)}
+          >
+            <option value="">Let the system pick</option>
+            <option value="photography">Photography — realistic scene</option>
+            <option value="illustration">Illustration — minimal, drawn</option>
+            <option value="infographic">Infographic — chart/data visual</option>
+          </select>
+          <div className="pillar-tag" style={{ marginTop: 6 }}>
+            🖼️ Instagram drafts get an AI-generated image attached automatically — no manual upload.
+          </div>
         </div>
       )}
 
@@ -128,7 +287,7 @@ export function NewTopicForm() {
 
       <div className="row">
         <button className="btn primary" type="submit" disabled={submitting}>
-          {submitting ? "Generating…" : "Generate draft(s)"}
+          {submitting ? "Checking…" : "Generate draft(s)"}
         </button>
       </div>
     </form>

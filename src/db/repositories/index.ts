@@ -205,6 +205,7 @@ export const topics = {
     platform?: string;
     format_hint?: string | null;
     must_say?: string | null;
+    platform_extra?: Topic["platform_extra"];
     priority?: number;
     status?: TopicStatus;
     pitch_group?: string | null;
@@ -212,8 +213,8 @@ export const topics = {
     const { rows } = await query<Topic>(
       `INSERT INTO topics
          (brand_id, source, pillar_id, angle, why_now, source_asset_id, platform,
-          format_hint, must_say, priority, status, pitch_group)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+          format_hint, must_say, platform_extra, priority, status, pitch_group)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [
         t.brand_id,
         t.source,
@@ -224,6 +225,7 @@ export const topics = {
         t.platform ?? "linkedin",
         t.format_hint ?? null,
         t.must_say ?? null,
+        t.platform_extra ? JSON.stringify(t.platform_extra) : null,
         t.priority ?? 0,
         t.status ?? "suggested",
         t.pitch_group ?? null,

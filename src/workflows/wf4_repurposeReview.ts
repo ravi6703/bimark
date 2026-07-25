@@ -8,7 +8,15 @@ import { buildMediaUrl, getImageGenerator } from "../images/index.js";
 import { retrieve } from "../rag/retrieve.js";
 import { getTelegram } from "../telegram/client.js";
 import { draftPreviewMessage } from "../telegram/messages.js";
-import type { Draft, ReviewerResult, RetrievedChunk, Topic } from "../types.js";
+import type {
+  Draft,
+  InstagramExtra,
+  LinkedInExtra,
+  ReviewerResult,
+  RetrievedChunk,
+  Topic,
+  XExtra,
+} from "../types.js";
 
 /**
  * WF-4 · Repurpose & Review → Draft (§16). Called by WF-2 (pitch pick) and WF-3
@@ -32,13 +40,20 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
   // Step 1 — gather grounding chunks (§16 WF-4.1).
   const { chunks, lowSource } = await gatherChunks(topic);
 
+  // Step 1b — fold structured per-platform guidance (§20) into the free-text
+  // must-say the draft prompt already understands, rather than growing the
+  // prompt builder's parameter list per platform.
+  const mustSay = [topic.must_say, extraGuidance(platform, topic.platform_extra)]
+    .filter(Boolean)
+    .join(" ") || undefined;
+
   // Step 2 — repurpose into a draft.
   let draftOut = await repurpose({
     voiceGuide,
     angle: topic.angle ?? "",
     pillar: pillarName,
     chunks,
-    mustSay: topic.must_say,
+    mustSay,
     format: topic.format_hint,
     platform,
   });
@@ -69,7 +84,7 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
       angle: `${topic.angle ?? ""} (revise to fix: ${reviewer.notes})`,
       pillar: pillarName,
       chunks,
-      mustSay: topic.must_say,
+      mustSay,
       format: topic.format_hint,
       platform,
     });
@@ -94,7 +109,11 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
   // Step 5b — Instagram can't post text-only (§20); generate + attach its image now
   // so the draft arrives in review already postable, no manual URL step.
   if (platform === "instagram") {
-    await attachGeneratedImage(draft, topic.angle ?? "", pillarName, brand?.visual_notes ?? null);
+    const visualStyle = (topic.platform_extra as InstagramExtra | null)?.visualStyle;
+    const visualNotes = [brand?.visual_notes, visualStyle ? `Visual style: ${visualStyle}.` : null]
+      .filter(Boolean)
+      .join(" ") || null;
+    await attachGeneratedImage(draft, topic.angle ?? "", pillarName, visualNotes);
   }
 
   // Step 6 — Telegram approval preview (§9 gate). Send the generated image
@@ -153,6 +172,40 @@ async function resolvePillarName(topic: Topic): Promise<string> {
 const VALID_PLATFORMS = new Set<TargetPlatform>(["linkedin", "x", "instagram"]);
 function normalizePlatform(p: string): TargetPlatform {
   return VALID_PLATFORMS.has(p as TargetPlatform) ? (p as TargetPlatform) : "linkedin";
+}
+
+/**
+ * Turns structured per-platform guidance (§20) into a plain-language
+ * instruction the existing draft prompt already knows how to use (mustSay).
+ * Instagram's visual style is handled separately — see attachGeneratedImage.
+ */
+function extraGuidance(platform: TargetPlatform, extra: Topic["platform_extra"]): string | null {
+  if (!extra) return null;
+  if (platform === "linkedin") {
+    const { audience, cta } = extra as LinkedInExtra;
+    return (
+      [
+        audience ? `Write for this audience: ${audience}.` : "",
+        cta ? `End with this call to action: ${cta}.` : "",
+      ]
+        .filter(Boolean)
+        .join(" ") || null
+    );
+  }
+  if (platform === "x") {
+    const { angleStyle } = extra as XExtra;
+    switch (angleStyle) {
+      case "hot-take":
+        return "Take a provocative, opinionated stance — don't hedge.";
+      case "question":
+        return "Frame it as a genuine question to the audience, not a statement.";
+      case "informative":
+        return "Keep it purely informative — no hot take, no question, just the insight.";
+      default:
+        return null;
+    }
+  }
+  return null; // instagram's platform_extra is visual-only, applied to the image prompt
 }
 
 /**

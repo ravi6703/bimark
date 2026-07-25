@@ -64,6 +64,19 @@ export interface ChannelConfig {
   active: boolean;
 }
 
+/** Structured per-platform guidance (§20), one shape per platform. */
+export interface LinkedInExtra {
+  audience?: string;
+  cta?: string;
+}
+export interface XExtra {
+  angleStyle?: "hot-take" | "informative" | "question";
+}
+export interface InstagramExtra {
+  visualStyle?: "photography" | "illustration" | "infographic";
+}
+export type PlatformExtra = LinkedInExtra | XExtra | InstagramExtra;
+
 export interface Topic {
   id: number;
   brand_id: number;
@@ -75,6 +88,7 @@ export interface Topic {
   platform: string;
   format_hint: string | null;
   must_say: string | null;
+  platform_extra: PlatformExtra | null;
   priority: number;
   status: TopicStatus;
   pitch_group: string | null;

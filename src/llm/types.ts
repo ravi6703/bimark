@@ -1,6 +1,7 @@
 /** Task categories that drive model routing (§20). */
 export type LlmTask =
   | "pitch" // daily pitch / ideation — fast, cheap tier
+  | "clarify" // pre-draft clarity check (§20) — fast tier
   | "draft" // first draft — fast tier
   | "polish" // final copy polish — strong tier
   | "review" // brand-safety reviewer — strong tier (safety is won here)

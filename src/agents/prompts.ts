@@ -163,6 +163,35 @@ Return plain text (no JSON).`;
   return { system, user };
 }
 
+/**
+ * §20 — pre-draft clarity check. Runs before repurpose() so a vague topic
+ * gets 1-2 sharp questions instead of a generic, unconvincing draft.
+ */
+export function clarifyPrompt(input: {
+  topic: string;
+  platforms: string[];
+  mustSay?: string;
+  whyNow?: string;
+}): { system: string; user: string } {
+  const system = `You are an editorial assistant deciding whether there's enough specific
+detail to draft a credible, grounded social post right now, or whether the
+operator needs to be asked first. Default to "sufficient" — only ask when a
+draft would otherwise clearly be generic or ungrounded. Never ask more than
+2 questions, and only about what's genuinely missing (a concrete example,
+a target audience, a timeframe, a stance) — not busywork.`;
+  const user = `TOPIC: ${input.topic}
+TARGET PLATFORMS: ${input.platforms.join(", ")}
+MUST-SAY POINTS: ${input.mustSay || "(none given)"}
+WHY NOW: ${input.whyNow || "(none given)"}
+
+Return ONLY JSON:
+{"sufficient": true} — if this is specific enough to draft from as-is, OR
+{"sufficient": false, "questions": [{"platform": "linkedin", "question": "..."}]}
+  — at most 2 questions total, each tied to a specific platform, short and
+  concrete. No preamble, no markdown.`;
+  return { system, user };
+}
+
 /** §20 — Instagram image generation prompt, built from the post's own grounding. */
 export function imagePrompt(input: {
   angle: string;
