@@ -57,6 +57,8 @@ describe("draft preview message (§9 gate)", () => {
     review_retries: 0,
     status: "pending_approval",
     created_at: new Date(),
+    repetitive: false,
+    similar_to_draft_id: null,
   };
 
   it("shows approve/edit/reject buttons", () => {

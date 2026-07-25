@@ -110,6 +110,18 @@ export const config = {
   rag: {
     similarityThreshold: num("RAG_SIMILARITY_THRESHOLD", 0.35),
     topK: int("RAG_TOP_K", 6),
+    // Distinctiveness guard (audit Phase 3, §1 "95-5 rule / distinctiveness
+    // over volume"): how similar a new draft can be to a recently
+    // approved/published one on the same platform before it's flagged as a
+    // likely repeat. Cosine similarity in embedding space. NOTE: this default
+    // was chosen against MockEmbedder's hashed bag-of-words space, which is
+    // NOT representative of a real embedder's distribution (per the Tech
+    // audit) — re-tune once EMBED_PROVIDER is set to a real provider, the
+    // same open item as RAG_SIMILARITY_THRESHOLD itself.
+    distinctivenessThreshold: num("RAG_DISTINCTIVENESS_THRESHOLD", 0.93),
+    // How far back to compare against — the point is catching "we just said
+    // this," not flagging every post that shares a pillar.
+    distinctivenessLookbackDays: int("RAG_DISTINCTIVENESS_LOOKBACK_DAYS", 60),
   },
 
   quality: {

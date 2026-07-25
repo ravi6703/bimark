@@ -143,6 +143,11 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
           🚩 Reviewer flagged (escalated): {draft.reviewer_result.notes}
         </div>
       )}
+      {draft.repetitive && (
+        <div className="meta-note">
+          🔁 Looks similar to a recent post{draft.similar_to_draft_id ? ` (draft #${draft.similar_to_draft_id})` : ""} — worth a genuinely new angle instead?
+        </div>
+      )}
 
       {draft.variants != null && draft.variants.length > 0 && (
         <div className="variants-box">

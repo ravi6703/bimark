@@ -356,6 +356,16 @@ export const drafts = {
   async setMediaAsset(id: number, mediaAssetId: number): Promise<void> {
     await query("UPDATE drafts SET media_asset_id = $2 WHERE id = $1", [id, mediaAssetId]);
   },
+  /** Distinctiveness guard (audit Phase 3) — persists the embedding for future comparisons. */
+  async setDistinctiveness(
+    id: number,
+    d: { embedding: number[]; repetitive: boolean; similarToDraftId: number | null },
+  ): Promise<void> {
+    await query(
+      `UPDATE drafts SET embedding = $2::vector, repetitive = $3, similar_to_draft_id = $4 WHERE id = $1`,
+      [id, toVector(d.embedding), d.repetitive, d.similarToDraftId],
+    );
+  },
   /**
    * Atomic status transition (audit Phase 0 concurrency guard) — the only
    * safe way to move a draft out of a given status. Two simultaneous actions

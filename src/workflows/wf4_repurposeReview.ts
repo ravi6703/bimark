@@ -5,6 +5,7 @@ import { review } from "../agents/reviewer.js";
 import { DEFAULT_VOICE_GUIDE, imagePrompt, type TargetPlatform } from "../agents/prompts.js";
 import { brands, drafts, mediaAssets, ownedAssets, pillars, topics } from "../db/repositories/index.js";
 import { buildMediaUrl, getImageGenerator } from "../images/index.js";
+import { checkDistinctiveness } from "../rag/distinctiveness.js";
 import { retrieve } from "../rag/retrieve.js";
 import { getTelegram } from "../telegram/client.js";
 import { draftPreviewMessage } from "../telegram/messages.js";
@@ -105,6 +106,27 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
     status: "pending_approval",
   });
   await topics.setStatus(topic.id, "drafted");
+
+  // Step 5a — distinctiveness guard (audit Phase 3): does this repeat a
+  // recently approved/published post on the same platform? Best-effort —
+  // an embedding failure shouldn't block the draft, same posture as the
+  // image-generation step below.
+  try {
+    const distinctiveness = await checkDistinctiveness(topic.brand_id, platform, draftOut.body, draft.id);
+    if (distinctiveness.embedding.length > 0) {
+      await drafts.setDistinctiveness(draft.id, distinctiveness);
+      draft.repetitive = distinctiveness.repetitive;
+      draft.similar_to_draft_id = distinctiveness.similarToDraftId;
+      if (distinctiveness.repetitive) {
+        logger.info(
+          { draftId: draft.id, similarToDraftId: distinctiveness.similarToDraftId, similarity: distinctiveness.similarity },
+          "WF-4: draft looks like a recent repeat",
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn({ err, draftId: draft.id }, "WF-4: distinctiveness check failed — proceeding without it");
+  }
 
   // Step 5b — Instagram can't post text-only (§20); generate + attach its image now
   // so the draft arrives in review already postable, no manual URL step.

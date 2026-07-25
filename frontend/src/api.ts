@@ -66,6 +66,8 @@ export interface Draft {
   created_at: string;
   topic_angle: string | null;
   pillar_name: string | null;
+  repetitive: boolean;
+  similar_to_draft_id: number | null;
 }
 export interface Topic {
   id: number;

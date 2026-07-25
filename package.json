@@ -16,6 +16,7 @@
     "seed": "node --import tsx src/db/seed.ts",
     "ingest": "node --import tsx src/cli/ingest.ts",
     "pitch": "node --import tsx src/cli/pitch.ts",
+    "eval:rag": "node --import tsx src/cli/evalRag.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

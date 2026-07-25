@@ -117,6 +117,9 @@ export interface Draft {
   review_retries: number;
   status: DraftStatus;
   created_at: Date;
+  /** Distinctiveness guard (audit Phase 3) — flags a likely repeat of a recent post. */
+  repetitive: boolean;
+  similar_to_draft_id: number | null;
 }
 
 /** A draft joined with its topic's angle/pillar for dashboard display. */
