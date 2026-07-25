@@ -25,6 +25,7 @@ function num(key: string, fallback: number): number {
 
 export type EmbedProvider = "mock" | "openai" | "voyage";
 export type PublishProvider = "mock" | "buffer" | "ayrshare";
+export type ImageProvider = "mock" | "openai" | "openrouter";
 
 export const config = {
   env: str("NODE_ENV", "development"),
@@ -75,6 +76,28 @@ export const config = {
       apiKey: str("AYRSHARE_API_KEY"),
     },
   },
+
+  image: {
+    provider: str("IMAGE_PROVIDER", "openrouter") as ImageProvider,
+    model: str("IMAGE_MODEL", "google/gemini-2.5-flash-image"),
+    size: str("IMAGE_SIZE", "1024x1024"), // only used by the openai provider
+    openrouter: {
+      apiKey: str("OPENROUTER_API_KEY"),
+    },
+    openai: {
+      apiKey: str("OPENAI_API_KEY"),
+    },
+  },
+
+  /** Own origin, for self-hosted media URLs (§20 image gen) that Ayrshare fetches. */
+  publicBaseUrl: str(
+    "PUBLIC_BASE_URL",
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : `http://localhost:${str("PORT", "3000")}`,
+  ),
 
   cron: {
     morningPitch: str("CRON_MORNING_PITCH", "0 8 * * *"),

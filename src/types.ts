@@ -111,6 +111,15 @@ export interface DraftWithContext extends Draft {
   brand_id: number;
 }
 
+export interface MediaAsset {
+  id: number;
+  draft_id: number;
+  type: "image" | "video";
+  mime_type: string;
+  data: Buffer;
+  model_used: string | null;
+}
+
 export interface Post {
   id: number;
   draft_id: number;

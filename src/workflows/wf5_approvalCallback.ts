@@ -1,5 +1,6 @@
 import { logger } from "../logger.js";
 import { approvals, drafts, posts } from "../db/repositories/index.js";
+import { buildMediaUrl } from "../images/index.js";
 import { editDistance } from "../metrics/editDistance.js";
 import { getPublisher } from "../publish/index.js";
 import { getTelegram } from "../telegram/client.js";
@@ -49,11 +50,18 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
     return { action: "reject", editDistance: 0 };
   }
 
-  // Instagram has no text-only post type — Ayrshare rejects it outright.
-  // Fail clearly here rather than let the publish call error opaquely.
-  if (draft.platform === "instagram" && !input.mediaUrls?.length) {
+  // Instagram has no text-only post type — Ayrshare rejects it outright. WF-4
+  // auto-generates + attaches an image for every Instagram draft; fall back to
+  // an explicit override if the caller passed one, and fail clearly if neither
+  // exists (image generation failed and nothing was supplied manually).
+  const mediaUrls =
+    input.mediaUrls?.length ? input.mediaUrls
+    : draft.media_asset_id != null ? [buildMediaUrl(draft.media_asset_id)]
+    : undefined;
+  if (draft.platform === "instagram" && !mediaUrls?.length) {
     throw new Error(
-      "Instagram posts require at least one image — pass mediaUrls when approving this draft.",
+      "Instagram posts require an image — image generation failed for this draft; " +
+        "pass mediaUrls explicitly to approve it anyway.",
     );
   }
 
@@ -78,7 +86,7 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
     platform: draft.platform,
     text: finalText,
     scheduledAt: input.scheduledAt ?? null,
-    mediaUrls: input.mediaUrls,
+    mediaUrls,
   });
 
   const now = new Date();

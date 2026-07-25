@@ -2,8 +2,9 @@ import { config } from "../config.js";
 import { logger } from "../logger.js";
 import { repurpose } from "../agents/repurpose.js";
 import { review } from "../agents/reviewer.js";
-import { DEFAULT_VOICE_GUIDE, type TargetPlatform } from "../agents/prompts.js";
-import { brands, drafts, ownedAssets, pillars, topics } from "../db/repositories/index.js";
+import { DEFAULT_VOICE_GUIDE, imagePrompt, type TargetPlatform } from "../agents/prompts.js";
+import { brands, drafts, mediaAssets, ownedAssets, pillars, topics } from "../db/repositories/index.js";
+import { getImageGenerator } from "../images/index.js";
 import { retrieve } from "../rag/retrieve.js";
 import { getTelegram } from "../telegram/client.js";
 import { draftPreviewMessage } from "../telegram/messages.js";
@@ -90,12 +91,47 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
   });
   await topics.setStatus(topic.id, "drafted");
 
+  // Step 5b — Instagram can't post text-only (§20); generate + attach its image now
+  // so the draft arrives in review already postable, no manual URL step.
+  if (platform === "instagram") {
+    await attachGeneratedImage(draft, topic.angle ?? "", pillarName, brand?.visual_notes ?? null);
+  }
+
   // Step 6 — Telegram approval preview (§9 gate).
   const { text, buttons } = draftPreviewMessage(draft);
   await getTelegram().sendMessage({ text, buttons });
 
   logger.info({ draftId: draft.id, topicId, lowSource, retries }, "WF-4: draft ready for approval");
   return draft;
+}
+
+/**
+ * Generates an Instagram image via the configured provider and attaches it to
+ * the draft. Best-effort: a failure here (no key, provider error) is logged
+ * and left for the human to notice at approval time (WF-5 still refuses to
+ * publish an Instagram draft with no media) rather than blocking the draft.
+ */
+async function attachGeneratedImage(
+  draft: Draft,
+  angle: string,
+  pillarName: string,
+  visualNotes: string | null,
+): Promise<void> {
+  try {
+    const prompt = imagePrompt({ angle, pillar: pillarName, visualNotes });
+    const image = await getImageGenerator().generate(prompt);
+    const asset = await mediaAssets.create({
+      draft_id: draft.id,
+      type: "image",
+      mime_type: image.mimeType,
+      data: image.data,
+      model_used: image.modelUsed,
+    });
+    await drafts.setMediaAsset(draft.id, asset.id);
+    draft.media_asset_id = asset.id;
+  } catch (err) {
+    logger.warn({ err, draftId: draft.id }, "WF-4: image generation failed — draft has no media");
+  }
 }
 
 async function resolvePillarName(topic: Topic): Promise<string> {

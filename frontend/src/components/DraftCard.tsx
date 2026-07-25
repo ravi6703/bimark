@@ -9,24 +9,21 @@ function PlatformBadge({ platform }: { platform: string }) {
 export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState(draft.body ?? "");
-  const [mediaUrl, setMediaUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const needsImage = draft.platform === "instagram";
+  const imageFailed = needsImage && draft.media_asset_id == null;
 
   async function handleApprove() {
     setError(null);
-    if (needsImage && !mediaUrl.trim()) {
-      setError("Instagram posts need an image URL — Instagram doesn't support text-only posts.");
+    if (imageFailed) {
+      setError("Image generation failed for this draft — it can't be posted to Instagram as-is.");
       return;
     }
     setBusy(true);
     try {
-      await api.approveDraft(draft.id, {
-        editedText: editing ? editedText : undefined,
-        mediaUrls: needsImage ? [mediaUrl.trim()] : undefined,
-      });
+      await api.approveDraft(draft.id, { editedText: editing ? editedText : undefined });
       onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Approve failed");
@@ -85,17 +82,15 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
         </div>
       )}
 
-      {needsImage && (
-        <div>
-          <label htmlFor={`media-${draft.id}`}>Image URL (required for Instagram)</label>
-          <input
-            id={`media-${draft.id}`}
-            type="url"
-            placeholder="https://…"
-            value={mediaUrl}
-            onChange={(e) => setMediaUrl(e.target.value)}
-          />
-        </div>
+      {needsImage && draft.media_asset_id != null && (
+        <img
+          className="draft-image"
+          src={`/api/media/${draft.media_asset_id}`}
+          alt="AI-generated visual for this post"
+        />
+      )}
+      {imageFailed && (
+        <div className="meta-note flag">🖼️ Image generation failed — nothing to post yet.</div>
       )}
 
       {error && <div className="error-box" style={{ marginTop: 10 }}>{error}</div>}

@@ -57,6 +57,7 @@ export interface Draft {
   variants: string[] | null;
   claims_used: string[] | null;
   low_source: boolean;
+  media_asset_id: number | null;
   model_used: string | null;
   prompt_version: string | null;
   reviewer_result: ReviewerResult | null;

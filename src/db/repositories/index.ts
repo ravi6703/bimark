@@ -4,6 +4,7 @@ import type {
   Draft,
   DraftStatus,
   DraftWithContext,
+  MediaAsset,
   OwnedAsset,
   Pillar,
   Post,
@@ -312,6 +313,9 @@ export const drafts = {
   async setBody(id: number, body: string, status: DraftStatus): Promise<void> {
     await query("UPDATE drafts SET body = $2, status = $3 WHERE id = $1", [id, body, status]);
   },
+  async setMediaAsset(id: number, mediaAssetId: number): Promise<void> {
+    await query("UPDATE drafts SET media_asset_id = $2 WHERE id = $1", [id, mediaAssetId]);
+  },
   /** For the dashboard's review queue — joins the topic's angle/pillar for context. */
   async listWithContext(
     brandId: number,
@@ -330,6 +334,32 @@ export const drafts = {
       params,
     );
     return rows;
+  },
+};
+
+// ── Generated media (§20 image generation) ────────────────────────────────────
+export const mediaAssets = {
+  /** Self-hosted — bytes live in Postgres, served by api/media/[id].ts. */
+  async create(a: {
+    draft_id: number;
+    type: "image" | "video";
+    mime_type: string;
+    data: Buffer;
+    model_used: string;
+  }): Promise<MediaAsset> {
+    const { rows } = await query<MediaAsset>(
+      `INSERT INTO assets (draft_id, type, mime_type, data, model_used)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, draft_id, type, mime_type, data, model_used`,
+      [a.draft_id, a.type, a.mime_type, a.data, a.model_used],
+    );
+    return rows[0]!;
+  },
+  async get(id: number): Promise<MediaAsset | null> {
+    const { rows } = await query<MediaAsset>(
+      "SELECT id, draft_id, type, mime_type, data, model_used FROM assets WHERE id = $1",
+      [id],
+    );
+    return rows[0] ?? null;
   },
 };
 

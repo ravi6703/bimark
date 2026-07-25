@@ -162,3 +162,21 @@ Write a short memo (<= 300 words) covering:
 Return plain text (no JSON).`;
   return { system, user };
 }
+
+/** §20 — Instagram image generation prompt, built from the post's own grounding. */
+export function imagePrompt(input: {
+  angle: string;
+  pillar: string;
+  visualNotes?: string | null;
+}): string {
+  return [
+    "A professional, brand-safe visual for a B2B social media post.",
+    `Topic: ${input.angle}.`,
+    input.pillar ? `Theme: ${input.pillar}.` : "",
+    input.visualNotes ? `Visual style notes: ${input.visualNotes}.` : "",
+    "Style: clean, modern, editorial photography or minimal illustration. " +
+      "No embedded text, no logos, no watermarks. Square 1:1 composition.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}

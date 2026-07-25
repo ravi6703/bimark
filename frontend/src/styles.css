@@ -101,6 +101,15 @@ body {
   margin-bottom: 14px;
 }
 
+.draft-image {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin: 10px 0;
+}
+
 .card-head {
   display: flex;
   align-items: center;

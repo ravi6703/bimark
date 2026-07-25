@@ -63,8 +63,29 @@ export function NewTopicForm() {
     }
   }
 
+  const includesInstagram = platforms.includes("instagram");
+
   return (
     <form className="card" onSubmit={handleSubmit}>
+      <label>Platforms — one draft is generated per platform, each with platform-native copy</label>
+      <div className="checkbox-row">
+        {PLATFORMS.map((p) => (
+          <label key={p.key}>
+            <input
+              type="checkbox"
+              checked={platforms.includes(p.key)}
+              onChange={() => togglePlatform(p.key)}
+            />
+            {p.label}
+          </label>
+        ))}
+      </div>
+      {includesInstagram && (
+        <div className="pillar-tag" style={{ marginTop: 6 }}>
+          🖼️ Instagram drafts get an AI-generated image attached automatically — no manual upload.
+        </div>
+      )}
+
       <label htmlFor="topic">Topic</label>
       <textarea
         id="topic"
@@ -83,20 +104,6 @@ export function NewTopicForm() {
           </option>
         ))}
       </select>
-
-      <label>Platforms — one draft is generated per platform, each with platform-native copy</label>
-      <div className="checkbox-row">
-        {PLATFORMS.map((p) => (
-          <label key={p.key}>
-            <input
-              type="checkbox"
-              checked={platforms.includes(p.key)}
-              onChange={() => togglePlatform(p.key)}
-            />
-            {p.label}
-          </label>
-        ))}
-      </div>
 
       <label htmlFor="mustsay">Must-say points (optional)</label>
       <input
