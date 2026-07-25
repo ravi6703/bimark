@@ -2,7 +2,7 @@ import { config } from "../config.js";
 import { logger } from "../logger.js";
 import { repurpose } from "../agents/repurpose.js";
 import { review } from "../agents/reviewer.js";
-import { DEFAULT_VOICE_GUIDE } from "../agents/prompts.js";
+import { DEFAULT_VOICE_GUIDE, type TargetPlatform } from "../agents/prompts.js";
 import { brands, drafts, ownedAssets, pillars, topics } from "../db/repositories/index.js";
 import { retrieve } from "../rag/retrieve.js";
 import { getTelegram } from "../telegram/client.js";
@@ -24,6 +24,7 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
   const voiceGuide = brand?.voice_guide ?? DEFAULT_VOICE_GUIDE;
   const bannedTopics = brand?.banned_topics ?? [];
   const pillarName = await resolvePillarName(topic);
+  const platform = normalizePlatform(topic.platform);
 
   await topics.setStatus(topic.id, "drafting");
 
@@ -38,6 +39,7 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
     chunks,
     mustSay: topic.must_say,
     format: topic.format_hint,
+    platform,
   });
 
   // Step 3 & 4 — brand-safety review loop; escalate if persistently flagged.
@@ -51,6 +53,7 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
       chunks,
       bannedTopics,
       voiceGuide,
+      platform,
     });
     if (reviewer.verdict === "pass") break;
 
@@ -67,6 +70,7 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
       chunks,
       mustSay: topic.must_say,
       format: topic.format_hint,
+      platform,
     });
   }
 
@@ -98,6 +102,11 @@ async function resolvePillarName(topic: Topic): Promise<string> {
   if (topic.pillar_id == null) return "";
   const list = await pillars.listActive(topic.brand_id);
   return list.find((p) => p.id === topic.pillar_id)?.name ?? "";
+}
+
+const VALID_PLATFORMS = new Set<TargetPlatform>(["linkedin", "x", "instagram"]);
+function normalizePlatform(p: string): TargetPlatform {
+  return VALID_PLATFORMS.has(p as TargetPlatform) ? (p as TargetPlatform) : "linkedin";
 }
 
 /**

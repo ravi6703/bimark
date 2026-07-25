@@ -3,6 +3,7 @@ import type {
   ChannelConfig,
   Draft,
   DraftStatus,
+  DraftWithContext,
   OwnedAsset,
   Pillar,
   Post,
@@ -245,6 +246,24 @@ export const topics = {
     );
     return rows[0] ?? null;
   },
+  /** For the dashboard's topic list. */
+  async list(brandId: number, opts: { status?: TopicStatus; limit?: number } = {}): Promise<Topic[]> {
+    const limit = opts.limit ?? 50;
+    if (opts.status) {
+      const { rows } = await query<Topic>(
+        `SELECT * FROM topics WHERE brand_id = $1 AND status = $2
+          ORDER BY priority DESC, created_at DESC LIMIT $3`,
+        [brandId, opts.status, limit],
+      );
+      return rows;
+    }
+    const { rows } = await query<Topic>(
+      `SELECT * FROM topics WHERE brand_id = $1
+        ORDER BY priority DESC, created_at DESC LIMIT $2`,
+      [brandId, limit],
+    );
+    return rows;
+  },
 };
 
 // ── Drafts ────────────────────────────────────────────────────────────────────
@@ -292,6 +311,25 @@ export const drafts = {
   },
   async setBody(id: number, body: string, status: DraftStatus): Promise<void> {
     await query("UPDATE drafts SET body = $2, status = $3 WHERE id = $1", [id, body, status]);
+  },
+  /** For the dashboard's review queue — joins the topic's angle/pillar for context. */
+  async listWithContext(
+    brandId: number,
+    opts: { status?: DraftStatus; limit?: number } = {},
+  ): Promise<DraftWithContext[]> {
+    const limit = opts.limit ?? 50;
+    const statusClause = opts.status ? "AND d.status = $2" : "";
+    const params: unknown[] = opts.status ? [brandId, opts.status, limit] : [brandId, limit];
+    const { rows } = await query<DraftWithContext>(
+      `SELECT d.*, t.angle AS topic_angle, t.brand_id AS brand_id, pl.name AS pillar_name
+         FROM drafts d
+         JOIN topics t ON t.id = d.topic_id
+         LEFT JOIN pillars pl ON pl.id = t.pillar_id
+        WHERE t.brand_id = $1 ${statusClause}
+        ORDER BY d.created_at DESC LIMIT $${opts.status ? 3 : 2}`,
+      params,
+    );
+    return rows;
   },
 };
 

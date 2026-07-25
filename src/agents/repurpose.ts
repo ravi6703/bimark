@@ -1,7 +1,7 @@
 import { getLlm, parseJson } from "../llm/index.js";
 import type { LlmProvider } from "../llm/types.js";
 import type { RetrievedChunk } from "../types.js";
-import { PROMPT_VERSION, repurposePrompt } from "./prompts.js";
+import { PROMPT_VERSION, repurposePrompt, type TargetPlatform } from "./prompts.js";
 
 export interface RepurposeOutput {
   body: string;
@@ -30,9 +30,11 @@ export async function repurpose(
     chunks: RetrievedChunk[];
     mustSay?: string | null;
     format?: string | null;
+    platform?: TargetPlatform;
   },
   llm: LlmProvider = getLlm(),
 ): Promise<RepurposeOutput> {
+  const platform = input.platform ?? "linkedin";
   const context = chunksToContext(input.chunks);
   const { system, user } = repurposePrompt({
     voiceGuide: input.voiceGuide,
@@ -41,6 +43,7 @@ export async function repurpose(
     retrievedChunks: context,
     mustSay: input.mustSay ?? null,
     format: input.format ?? null,
+    platform,
   });
 
   const res = await llm.complete({
@@ -49,7 +52,7 @@ export async function repurpose(
     messages: [{ role: "user", content: user }],
     json: true,
     maxTokens: 900,
-    mockResult: JSON.stringify(mockDraft(input.angle, input.chunks)),
+    mockResult: JSON.stringify(mockDraft(input.angle, input.chunks, platform)),
   });
 
   const parsed = parseJson<{ body: string; variants?: string[]; claims_used?: string[] }>(
@@ -57,7 +60,9 @@ export async function repurpose(
     "repurpose",
   );
   return {
-    body: parsed.body,
+    // X has a hard 280-char limit Ayrshare will reject past — enforce it in
+    // code too, not just via the prompt, since LLMs occasionally overshoot.
+    body: platform === "x" ? hardTruncate(parsed.body, 280) : parsed.body,
     variants: parsed.variants ?? [],
     claims_used: parsed.claims_used ?? [],
     promptVersion: PROMPT_VERSION,
@@ -65,17 +70,28 @@ export async function repurpose(
   };
 }
 
+function hardTruncate(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
 /** Deterministic offline draft grounded in the retrieved snippets. */
-function mockDraft(angle: string, chunks: RetrievedChunk[]): {
+function mockDraft(
+  angle: string,
+  chunks: RetrievedChunk[],
+  platform: TargetPlatform,
+): {
   body: string;
   variants: string[];
   claims_used: string[];
 } {
   const lead = chunks[0]?.chunk_text?.replace(/\s+/g, " ").slice(0, 180) ?? "";
   const body =
-    `${angle}.\n\n${lead}\n\n` +
-    "The takeaway for anyone building employability at scale: ground the work in " +
-    "real outcomes, not slogans. That is how trust compounds.";
+    platform === "x"
+      ? hardTruncate(`${angle}. ${lead}`, 280)
+      : `${angle}.\n\n${lead}\n\n` +
+        "The takeaway for anyone building employability at scale: ground the work in " +
+        "real outcomes, not slogans. That is how trust compounds.";
   return {
     body,
     variants: [`A sharper hook on: ${angle}`, `A data-led hook on: ${angle}`],

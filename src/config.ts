@@ -94,6 +94,16 @@ export const config = {
     // Max reviewer round-trips before escalating a persistently flagged draft (WF-4.4).
     maxReviewRetries: int("MAX_REVIEW_RETRIES", 2),
   },
+
+  admin: {
+    // Shared password gating the dashboard (single-operator "editor-in-chief"
+    // tool, §9 — not a multi-tenant auth system). Unset ⇒ dashboard API
+    // endpoints reject every request (fail closed, not open).
+    password: str("ADMIN_PASSWORD"),
+    get enabled() {
+      return this.password !== "";
+    },
+  },
 } as const;
 
 export type Config = typeof config;

@@ -13,8 +13,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
   try {
-    const { topicId, draft } = await handleManualIntake(req.body);
-    res.status(200).json({ ok: true, topicId, draftId: draft.id });
+    const results = await handleManualIntake(req.body);
+    res.status(200).json({
+      ok: true,
+      results: results.map((r) => ({ platform: r.platform, topicId: r.topicId, draftId: r.draft.id })),
+    });
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: err.issues });

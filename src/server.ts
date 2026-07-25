@@ -34,8 +34,11 @@ export function createServer() {
   // WF-3 · Manual Intake
   app.post("/webhooks/manual-intake", async (req: Request, res: Response) => {
     try {
-      const { topicId, draft } = await handleManualIntake(req.body);
-      res.json({ ok: true, topicId, draftId: draft.id });
+      const results = await handleManualIntake(req.body);
+      res.json({
+        ok: true,
+        results: results.map((r) => ({ platform: r.platform, topicId: r.topicId, draftId: r.draft.id })),
+      });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues });
       logger.error({ err }, "manual-intake failed");

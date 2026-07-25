@@ -22,9 +22,10 @@ export class AyrsharePublisher implements Publisher {
   }
 
   async publish(req: PublishRequest): Promise<PublishResult> {
+    const ayrsharePlatform = toAyrsharePlatform(req.platform);
     const payload: Record<string, unknown> = {
       post: req.text,
-      platforms: [req.platform],
+      platforms: [ayrsharePlatform],
     };
     if (req.mediaUrls?.length) payload.mediaUrls = req.mediaUrls;
     if (req.scheduledAt) payload.scheduleDate = req.scheduledAt.toISOString();
@@ -39,7 +40,7 @@ export class AyrsharePublisher implements Publisher {
       id?: string;
       postIds?: { platform: string; postUrl?: string; id?: string }[];
     };
-    const first = json.postIds?.find((p) => p.platform === req.platform) ?? json.postIds?.[0];
+    const first = json.postIds?.find((p) => p.platform === ayrsharePlatform) ?? json.postIds?.[0];
     return {
       externalId: json.id ?? first?.id ?? null,
       url: first?.postUrl ?? null,
@@ -75,4 +76,14 @@ export class AyrsharePublisher implements Publisher {
       return null;
     }
   }
+}
+
+/**
+ * Our internal platform value is "x" (matches the PRD's naming and the zod
+ * enum in wf3_manualIntake.ts); Ayrshare kept "twitter" as the platform
+ * identifier in their API even after the X rebrand. Everything else maps
+ * 1:1.
+ */
+function toAyrsharePlatform(platform: string): string {
+  return platform === "x" ? "twitter" : platform;
 }

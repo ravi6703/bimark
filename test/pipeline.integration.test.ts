@@ -75,11 +75,12 @@ d("end-to-end pipeline (§16 WF-1..WF-7)", () => {
   });
 
   it("WF-3 + WF-5: manual intake (priority) drafts, and approve-with-edits publishes + logs edit distance", async () => {
-    const { topicId, draft } = await handleManualIntake({
+    const intakeResults = await handleManualIntake({
       brand_id: brandId,
       topic: "Why applied assessment predicts on-the-job performance",
       pillar: "Applied assessment",
     });
+    const { topicId, draft } = intakeResults[0]!;
     const t = await topics.get(topicId);
     expect(t!.priority).toBe(10); // human topics outrank AI ones
 
@@ -94,6 +95,22 @@ d("end-to-end pipeline (§16 WF-1..WF-7)", () => {
     expect(result.editDistance).toBeGreaterThan(0);
     expect(result.post?.external_id).toBeTruthy();
     expect(result.post?.poll_until).toBeInstanceOf(Date);
+  });
+
+  it("WF-3 multi-platform: one topic targeting multiple platforms creates one draft per platform", async () => {
+    const results = await handleManualIntake({
+      brand_id: brandId,
+      topic: "Why task-based assessment beats multiple-choice",
+      pillar: "Applied assessment",
+      platforms: ["linkedin", "x"],
+    });
+    expect(results).toHaveLength(2);
+    expect(results.map((r) => r.platform).sort()).toEqual(["linkedin", "x"]);
+    for (const r of results) {
+      expect(r.draft.platform).toBe(r.platform);
+    }
+    const xDraft = results.find((r) => r.platform === "x")!.draft;
+    expect(xDraft.body!.length).toBeLessThanOrEqual(280);
   });
 
   it("WF-6: analytics poller records metrics for a live post", async () => {

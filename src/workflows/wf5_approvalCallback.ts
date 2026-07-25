@@ -16,6 +16,8 @@ export interface FinalizeInput {
   approver: string;
   reason?: string;
   scheduledAt?: Date | null;
+  /** Required for Instagram — Ayrshare (and Instagram itself) rejects text-only posts. */
+  mediaUrls?: string[];
 }
 
 export interface FinalizeResult {
@@ -47,6 +49,14 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
     return { action: "reject", editDistance: 0 };
   }
 
+  // Instagram has no text-only post type — Ayrshare rejects it outright.
+  // Fail clearly here rather than let the publish call error opaquely.
+  if (draft.platform === "instagram" && !input.mediaUrls?.length) {
+    throw new Error(
+      "Instagram posts require at least one image — pass mediaUrls when approving this draft.",
+    );
+  }
+
   // Approve (optionally with edits).
   const edited = input.editedText != null && input.editedText.trim() !== "" &&
     input.editedText.trim() !== aiBody.trim();
@@ -68,6 +78,7 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
     platform: draft.platform,
     text: finalText,
     scheduledAt: input.scheduledAt ?? null,
+    mediaUrls: input.mediaUrls,
   });
 
   const now = new Date();

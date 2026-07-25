@@ -42,6 +42,33 @@ Return ONLY JSON: {"A":{"angle","pillar","asset_id","why_now"},
   return { system, user };
 }
 
+/**
+ * Per-platform copy constraints (§5 platform strategy). LinkedIn is the
+ * primary, full-length thought-leadership format; X/Instagram are meant to
+ * carry the *same underlying insight* in a platform-native shape, not
+ * independent invention. Kept intentionally simple (single post, no threads,
+ * no image generation) — matches what's actually built (§20: image gen is a
+ * later phase).
+ */
+export type TargetPlatform = "linkedin" | "x" | "instagram";
+
+function platformSpec(platform: TargetPlatform): string {
+  switch (platform) {
+    case "x":
+      return `PLATFORM: X (Twitter). A single post, <=280 characters INCLUDING spaces
+and any hashtags. One sharp idea, not a summary of the LinkedIn version.
+At most 1 hashtag. No thread — one post only.`;
+    case "instagram":
+      return `PLATFORM: Instagram caption. 3-6 short lines, warmer and more direct than
+LinkedIn but still credible (never hype-y). End with up to 5 relevant,
+specific hashtags (no generic tags like #motivation). This is a CAPTION —
+assume an image/carousel accompanies it; do not describe a nonexistent visual.`;
+    case "linkedin":
+    default:
+      return `PLATFORM: LinkedIn. 120-200 words. No hashtag spam (max 3, relevant).`;
+  }
+}
+
 /** §17.3 — Repurposing. */
 export function repurposePrompt(input: {
   voiceGuide: string;
@@ -50,6 +77,7 @@ export function repurposePrompt(input: {
   retrievedChunks: string;
   mustSay?: string | null;
   format?: string | null;
+  platform?: TargetPlatform;
 }): { system: string; user: string } {
   const system = `You are a senior B2B content writer for Board Infinity. Objective: BRAND
 CREDIBILITY, not lead-gen.`;
@@ -62,14 +90,17 @@ CREDIBILITY, not lead-gen.`;
   const user = `VOICE GUIDE: ${input.voiceGuide}
 TOPIC / ANGLE: ${input.angle}   PILLAR: ${input.pillar}
 SOURCE MATERIAL (the ONLY factual basis you may use): ${input.retrievedChunks}
+${platformSpec(input.platform ?? "linkedin")}
 ${extras}
 
-Write a LinkedIn post that:
+Write a post that:
 - Opens with a specific insight or number drawn from the source material.
 - Takes a clear point of view. Reads like a knowledgeable human, not AI.
 - Uses ONLY facts present in the source material. If a claim isn't supported,
   don't make it. Never invent stats, client names, or outcomes.
-- 120–200 words. No hashtag spam (max 3, relevant). No engagement-bait.
+- No engagement-bait ("Agree? 👇", "Thoughts?").
+- Respects the platform's length limit above exactly — count characters/words
+  before finalizing.
 
 Return JSON: {"body": "...", "variants": ["alt hook 1","alt hook 2"],
 "claims_used": ["quote/ref each factual claim back to the source"]}.`;
@@ -83,12 +114,18 @@ export function reviewerPrompt(input: {
   retrievedChunks: string;
   bannedTopics: string;
   voiceGuide: string;
+  platform?: TargetPlatform;
 }): { system: string; user: string } {
   const system = `You are Board Infinity's brand-safety and quality reviewer. You are strict.
 Review the draft against this checklist and BLOCK anything that fails.`;
+  const lengthCheck =
+    input.platform === "x"
+      ? "6. Is <=280 characters total (X's hard limit)."
+      : "6. Fits the platform's length norm (roughly 120-200 words for LinkedIn, a short caption for Instagram).";
   const user = `DRAFT: ${input.draft}
 CLAIMS_USED: ${input.claimsUsed}   SOURCE MATERIAL: ${input.retrievedChunks}
 BANNED TOPICS: ${input.bannedTopics}   VOICE GUIDE: ${input.voiceGuide}
+PLATFORM: ${input.platform ?? "linkedin"}
 
 Checklist (any FAIL => verdict "flag"):
 1. Every factual claim is supported by the source material. No hallucinated
@@ -97,6 +134,7 @@ Checklist (any FAIL => verdict "flag"):
 3. No client/partner named without sign-off.
 4. Matches the voice guide; passes the "IIT dean" litmus test.
 5. No engagement-bait, no buzzword salad, no hard sell.
+${lengthCheck}
 
 Return JSON: {"verdict":"pass"|"flag", "flags":[...], "notes":"specific fixes"}.`;
   return { system, user };

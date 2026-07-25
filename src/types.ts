@@ -104,6 +104,13 @@ export interface Draft {
   created_at: Date;
 }
 
+/** A draft joined with its topic's angle/pillar for dashboard display. */
+export interface DraftWithContext extends Draft {
+  topic_angle: string | null;
+  pillar_name: string | null;
+  brand_id: number;
+}
+
 export interface Post {
   id: number;
   draft_id: number;

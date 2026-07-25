@@ -1,7 +1,7 @@
 import { getLlm, parseJson } from "../llm/index.js";
 import type { LlmProvider } from "../llm/types.js";
 import type { ReviewerResult, RetrievedChunk } from "../types.js";
-import { reviewerPrompt } from "./prompts.js";
+import { reviewerPrompt, type TargetPlatform } from "./prompts.js";
 
 /**
  * Brand-Safety Reviewer (§10 / §17.4) — the hard gate before the human. Runs on
@@ -15,6 +15,7 @@ export async function review(
     chunks: RetrievedChunk[];
     bannedTopics: string[];
     voiceGuide: string;
+    platform?: TargetPlatform;
   },
   llm: LlmProvider = getLlm(),
 ): Promise<ReviewerResult> {
@@ -26,6 +27,7 @@ export async function review(
       .join("\n\n"),
     bannedTopics: input.bannedTopics.join(", ") || "(none configured)",
     voiceGuide: input.voiceGuide,
+    platform: input.platform,
   });
 
   const res = await llm.complete({
