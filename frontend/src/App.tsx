@@ -8,6 +8,7 @@ import { MetricsView } from "./components/MetricsView";
 import { TeamView } from "./components/TeamView";
 import { TopicsView } from "./components/TopicsView";
 import { InsightsView } from "./components/InsightsView";
+import { CalendarView } from "./components/CalendarView";
 
 const TABS = [
   {
@@ -16,6 +17,13 @@ const TABS = [
     icon: "📥",
     title: "Review queue",
     subtitle: "Approve, edit, reject, schedule, or hold drafts before they go out.",
+  },
+  {
+    key: "calendar",
+    label: "Calendar",
+    icon: "📅",
+    title: "Calendar",
+    subtitle: "Everything scheduled or published, by day.",
   },
   {
     key: "new",
@@ -80,8 +88,20 @@ export function App() {
   useEffect(() => {
     if (!authed) return;
     refreshPendingCount();
-    const id = setInterval(refreshPendingCount, 30000);
-    return () => clearInterval(id);
+    // A shorter fallback interval plus an immediate refetch whenever this tab
+    // regains focus — a shared queue's badge goes stale fast on a plain
+    // 30s-only timer, and staleness directly causes teammates to duplicate
+    // each other's work (audit Phase 2). True push isn't viable on Vercel's
+    // serverless functions, so this is the practical substitute.
+    const id = setInterval(refreshPendingCount, 20000);
+    window.addEventListener("focus", refreshPendingCount);
+    document.addEventListener("visibilitychange", refreshPendingCount);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", refreshPendingCount);
+      document.removeEventListener("visibilitychange", refreshPendingCount);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
   if (!authed) {
@@ -116,17 +136,20 @@ export function App() {
           </div>
         </div>
 
-        <nav className="side-nav">
+        <nav className="side-nav" role="navigation" aria-label="Main">
           {TABS.map((t) => (
             <button
               key={t.key}
               className={tab === t.key ? "active" : ""}
+              aria-current={tab === t.key ? "page" : undefined}
               onClick={() => goTo(t.key)}
             >
               <span className="side-nav-icon">{t.icon}</span>
               <span className="side-nav-label">{t.label}</span>
               {t.key === "queue" && !!pendingCount && (
-                <span className="nav-badge">{pendingCount}</span>
+                <span className="nav-badge" aria-live="polite" aria-atomic="true">
+                  {pendingCount}
+                </span>
               )}
             </button>
           ))}
@@ -152,6 +175,7 @@ export function App() {
         </header>
 
         {tab === "queue" && <DraftQueue onDraftsChanged={refreshPendingCount} />}
+        {tab === "calendar" && <CalendarView />}
         {tab === "new" && <NewTopicForm />}
         {tab === "topics" && <TopicsView />}
         {tab === "insights" && <InsightsView />}

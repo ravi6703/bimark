@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { api, ApiError, type Draft } from "../api";
+import { api, ApiError, type ApprovalEntry, type Draft } from "../api";
+import { PlatformPreview } from "./PlatformPreview";
 
 /** Platform badge + human label. */
 function PlatformBadge({ platform }: { platform: string }) {
@@ -17,6 +18,17 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
   const [error, setError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [activity, setActivity] = useState<ApprovalEntry[] | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
+
+  async function loadActivity() {
+    if (activity != null) return; // already loaded, toggling just re-shows it
+    try {
+      setActivity(await api.getDraftActivity(draft.id));
+    } catch (err) {
+      setActivityError(err instanceof ApiError ? err.message : "Failed to load activity");
+    }
+  }
 
   const needsImage = draft.platform === "instagram";
   const imageFailed = needsImage && draft.media_asset_id == null;
@@ -114,7 +126,11 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
           rows={6}
         />
       ) : (
-        <div className="body-text">{draft.body}</div>
+        <PlatformPreview
+          platform={draft.platform}
+          body={draft.body ?? ""}
+          mediaAssetId={draft.media_asset_id}
+        />
       )}
 
       {draft.low_source && (
@@ -153,23 +169,37 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
         </details>
       )}
 
-      {needsImage && draft.media_asset_id != null && (
-        <>
-          <img
-            className="draft-image"
-            src={`/api/media/${draft.media_asset_id}`}
-            alt="AI-generated visual for this post"
-          />
-          <div className="row" style={{ marginTop: -4 }}>
-            <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating || busy}>
-              🔄 {regenerating ? "Regenerating…" : "Regenerate image"}
-            </button>
-          </div>
-        </>
+      <details className="activity-box" onToggle={(e) => e.currentTarget.open && loadActivity()}>
+        <summary>Activity</summary>
+        {activityError && <div className="error-box" style={{ marginTop: 8 }}>{activityError}</div>}
+        {activity == null && !activityError && <div className="pillar-tag">Loading…</div>}
+        {activity != null && activity.length === 0 && (
+          <div className="pillar-tag">No actions recorded yet.</div>
+        )}
+        {activity != null && activity.length > 0 && (
+          <ul className="activity-list">
+            {activity.map((a) => (
+              <li key={a.id}>
+                <b>{a.approver}</b> {a.action}
+                {a.action === "edit" && a.edit_distance != null ? ` (${a.edit_distance} chars changed)` : ""}
+                {a.reason ? ` — ${a.reason}` : ""}
+                <span className="activity-time">{new Date(a.created_at).toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+
+      {needsImage && draft.media_asset_id != null && !editing && (
+        <div className="row" style={{ marginTop: -4 }}>
+          <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating || busy}>
+            🔄 {regenerating ? "Regenerating…" : "Regenerate image"}
+          </button>
+        </div>
       )}
       {imageFailed && (
         <>
-          <div className="meta-note flag">🖼️ Image generation failed — nothing to post yet.</div>
+          {editing && <div className="meta-note flag">🖼️ Image generation failed — nothing to post yet.</div>}
           <div className="row" style={{ marginTop: -4 }}>
             <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating}>
               🔄 {regenerating ? "Trying again…" : "Try generating again"}
@@ -191,7 +221,8 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
         </>
       ) : (
         <>
-          <div className="publish-mode-row">
+          <fieldset className="publish-mode-row">
+            <legend>Publish mode</legend>
             <label>
               <input
                 type="radio"
@@ -219,7 +250,7 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
               />
               Approve &amp; hold (publish manually later)
             </label>
-          </div>
+          </fieldset>
           {mode === "schedule" && (
             <input
               type="datetime-local"

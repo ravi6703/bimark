@@ -107,6 +107,25 @@ export interface Insight {
   memo: string;
   created_at: string;
 }
+export interface ApprovalEntry {
+  id: number;
+  approver: string;
+  action: "approve" | "edit" | "reject" | "publish";
+  reason: string | null;
+  edit_distance: number | null;
+  created_at: string;
+}
+export interface PostItem {
+  id: number;
+  draft_id: number;
+  platform: string;
+  url: string | null;
+  scheduled_at: string | null;
+  published_at: string | null;
+  body: string | null;
+  media_asset_id: number | null;
+  pillar_name: string | null;
+}
 
 // ── Per-platform guidance (§20) ──────────────────────────────────────────────
 export interface PlatformDetails {
@@ -213,6 +232,17 @@ export const api = {
 
   async regenerateImage(draftId: number) {
     return request(`/drafts/${draftId}/regenerate-image`, { method: "POST" });
+  },
+
+  async getDraftActivity(draftId: number): Promise<ApprovalEntry[]> {
+    const { activity } = await request<{ activity: ApprovalEntry[] }>(`/drafts/${draftId}/activity`);
+    return activity;
+  },
+
+  async listPosts(range: { from: string; to: string }): Promise<PostItem[]> {
+    const qs = new URLSearchParams(range).toString();
+    const { posts } = await request<{ posts: PostItem[] }>(`/posts?${qs}`);
+    return posts;
   },
 
   async approveDraft(

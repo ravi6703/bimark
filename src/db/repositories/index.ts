@@ -1,4 +1,5 @@
 import type {
+  ApprovalEntry,
   Brand,
   ChannelConfig,
   Draft,
@@ -8,6 +9,7 @@ import type {
   OwnedAsset,
   Pillar,
   Post,
+  PostWithContext,
   ReviewerResult,
   Topic,
   TopicStatus,
@@ -461,6 +463,15 @@ export const approvals = {
       sample,
     };
   },
+  /** A draft's audit trail (audit Phase 2) — makes Phase 0's real approver identity visible. */
+  async listForDraft(draftId: number): Promise<ApprovalEntry[]> {
+    const { rows } = await query<ApprovalEntry>(
+      `SELECT id, approver, action, reason, edit_distance, created_at
+         FROM approvals WHERE draft_id = $1 ORDER BY created_at ASC`,
+      [draftId],
+    );
+    return rows;
+  },
 };
 
 // ── Posts ──────────────────────────────────────────────────────────────────────
@@ -503,6 +514,25 @@ export const posts = {
       [since],
     );
     return Number(rows[0]?.n ?? 0);
+  },
+  /** Calendar view (audit Phase 2) — scheduled + published posts, joined for display. */
+  async listWithContext(
+    brandId: number,
+    opts: { from: Date; to: Date },
+  ): Promise<PostWithContext[]> {
+    const { rows } = await query<PostWithContext>(
+      `SELECT po.*, d.body, d.media_asset_id, pl.name AS pillar_name
+         FROM posts po
+         JOIN drafts d ON d.id = po.draft_id
+         JOIN topics t ON t.id = d.topic_id
+         LEFT JOIN pillars pl ON pl.id = t.pillar_id
+        WHERE t.brand_id = $1
+          AND coalesce(po.scheduled_at, po.published_at) >= $2
+          AND coalesce(po.scheduled_at, po.published_at) < $3
+        ORDER BY coalesce(po.scheduled_at, po.published_at) ASC`,
+      [brandId, opts.from, opts.to],
+    );
+    return rows;
   },
 };
 

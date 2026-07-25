@@ -39,13 +39,31 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
+  // Refetch whenever the tab regains focus — a shared queue goes stale fast
+  // otherwise, and staleness directly causes teammates to duplicate each
+  // other's work (audit Phase 2).
+  useEffect(() => {
+    function onFocus() {
+      load();
+    }
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
   return (
     <div>
       <div className="queue-toolbar">
-        <div className="status-tabs">
+        <div className="status-tabs" role="tablist" aria-label="Filter by status">
           {STATUSES.map((s) => (
             <button
               key={s.key}
+              role="tab"
+              aria-selected={status === s.key}
               className={status === s.key ? "active" : ""}
               onClick={() => setStatus(s.key)}
             >

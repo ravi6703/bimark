@@ -223,6 +223,8 @@ export function NewTopicForm() {
                   type="button"
                   className="accordion-header"
                   aria-expanded={isOpen}
+                  aria-controls={`accordion-panel-${p.key}`}
+                  id={`accordion-header-${p.key}`}
                   onClick={() => setOpenPlatform(isOpen ? null : p.key)}
                 >
                   <span className="accordion-chevron">{isOpen ? "▾" : "▸"}</span>
@@ -231,7 +233,12 @@ export function NewTopicForm() {
                 </button>
 
                 {isOpen && (
-                  <div className="accordion-body">
+                  <div
+                    className="accordion-body"
+                    id={`accordion-panel-${p.key}`}
+                    role="region"
+                    aria-labelledby={`accordion-header-${p.key}`}
+                  >
                     {p.key === "linkedin" && (
                       <>
                         <label htmlFor="li-audience">Target audience (optional)</label>

@@ -154,3 +154,20 @@ export interface Post {
   published_at: Date | null;
   poll_until: Date | null;
 }
+
+/** A post joined with its draft/topic for the calendar view (audit Phase 2). */
+export interface PostWithContext extends Post {
+  body: string | null;
+  media_asset_id: number | null;
+  pillar_name: string | null;
+}
+
+/** One row of a draft's audit trail (audit Phase 2 — makes Phase 0's identity fix visible). */
+export interface ApprovalEntry {
+  id: number;
+  approver: string;
+  action: "approve" | "edit" | "reject" | "publish";
+  reason: string | null;
+  edit_distance: number | null;
+  created_at: Date;
+}
