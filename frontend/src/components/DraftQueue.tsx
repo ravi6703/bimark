@@ -11,7 +11,7 @@ const STATUSES = [
   { key: "all", label: "All" },
 ];
 
-export function DraftQueue() {
+export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void } = {}) {
   const [status, setStatus] = useState("pending_approval");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +29,11 @@ export function DraftQueue() {
     }
   }
 
+  function handleChanged() {
+    load();
+    onDraftsChanged?.();
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -36,16 +41,23 @@ export function DraftQueue() {
 
   return (
     <div>
-      <div className="status-tabs">
-        {STATUSES.map((s) => (
-          <button
-            key={s.key}
-            className={status === s.key ? "active" : ""}
-            onClick={() => setStatus(s.key)}
-          >
-            {s.label}
-          </button>
-        ))}
+      <div className="queue-toolbar">
+        <div className="status-tabs">
+          {STATUSES.map((s) => (
+            <button
+              key={s.key}
+              className={status === s.key ? "active" : ""}
+              onClick={() => setStatus(s.key)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        {!loading && !error && (
+          <span className="queue-count">
+            {drafts.length} draft{drafts.length === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
 
       {error && <div className="error-box">{error}</div>}
@@ -54,7 +66,7 @@ export function DraftQueue() {
         <div className="empty">No drafts here right now.</div>
       )}
       {drafts.map((d) => (
-        <DraftCard key={d.id} draft={d} onChanged={load} />
+        <DraftCard key={d.id} draft={d} onChanged={handleChanged} />
       ))}
     </div>
   );

@@ -15,7 +15,8 @@ export function NewTopicForm() {
   const [mustSay, setMustSay] = useState("");
   const [whyNow, setWhyNow] = useState("");
 
-  // Per-platform fields (§20) — only the checked platform's fields matter.
+  // Per-platform fields (§20) — one platform's block is expanded at a time.
+  const [openPlatform, setOpenPlatform] = useState<string | null>("linkedin");
   const [linkedinAudience, setLinkedinAudience] = useState("");
   const [linkedinCta, setLinkedinCta] = useState("");
   const [xAngleStyle, setXAngleStyle] = useState<"" | "hot-take" | "informative" | "question">("");
@@ -36,7 +37,32 @@ export function NewTopicForm() {
   }, []);
 
   function togglePlatform(key: string) {
-    setPlatforms((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
+    const has = platforms.includes(key);
+    if (has) {
+      setPlatforms((prev) => prev.filter((p) => p !== key));
+      setOpenPlatform((op) => (op === key ? null : op));
+    } else {
+      setPlatforms((prev) => [...prev, key]);
+      setOpenPlatform(key);
+    }
+  }
+
+  function platformSummary(key: string): string {
+    if (key === "linkedin") {
+      const parts = [];
+      if (linkedinAudience) parts.push(`Audience: ${linkedinAudience}`);
+      if (linkedinCta) parts.push(`CTA: ${linkedinCta}`);
+      return parts.length ? parts.join(" · ") : "Using default audience & CTA";
+    }
+    if (key === "x") {
+      return xAngleStyle ? `Angle: ${xAngleStyle}` : "Letting the system pick the angle";
+    }
+    if (key === "instagram") {
+      return instagramVisualStyle
+        ? `Visual: ${instagramVisualStyle}`
+        : "Letting the system pick the visual style";
+    }
+    return "";
   }
 
   function buildPlatformDetails(): PlatformDetails {
@@ -132,8 +158,6 @@ export function NewTopicForm() {
     await generate(extra);
   }
 
-  const includesInstagram = platforms.includes("instagram");
-
   if (questions) {
     return (
       <form className="card" onSubmit={handleAnswerSubmit}>
@@ -175,7 +199,7 @@ export function NewTopicForm() {
 
   return (
     <form className="card" onSubmit={handleSubmit}>
-      <label>Platforms — one draft is generated per platform, each with platform-native copy</label>
+      <label>Platforms — check all that should get a draft, then tap one to customize it</label>
       <div className="checkbox-row">
         {PLATFORMS.map((p) => (
           <label key={p.key}>
@@ -189,59 +213,88 @@ export function NewTopicForm() {
         ))}
       </div>
 
-      {platforms.includes("linkedin") && (
-        <div className="platform-fields">
-          <label htmlFor="li-audience">LinkedIn — target audience (optional)</label>
-          <input
-            id="li-audience"
-            type="text"
-            value={linkedinAudience}
-            onChange={(e) => setLinkedinAudience(e.target.value)}
-            placeholder="e.g. senior HR leaders, placement officers"
-          />
-          <label htmlFor="li-cta">LinkedIn — call to action (optional)</label>
-          <input
-            id="li-cta"
-            type="text"
-            value={linkedinCta}
-            onChange={(e) => setLinkedinCta(e.target.value)}
-            placeholder="e.g. ask readers to share their view"
-          />
-        </div>
-      )}
+      {platforms.length > 0 && (
+        <div className="platform-accordion">
+          {PLATFORMS.filter((p) => platforms.includes(p.key)).map((p) => {
+            const isOpen = openPlatform === p.key;
+            return (
+              <div className={`accordion-item ${isOpen ? "open" : ""}`} key={p.key}>
+                <button
+                  type="button"
+                  className="accordion-header"
+                  aria-expanded={isOpen}
+                  onClick={() => setOpenPlatform(isOpen ? null : p.key)}
+                >
+                  <span className="accordion-chevron">{isOpen ? "▾" : "▸"}</span>
+                  <span className="accordion-label">{p.label}</span>
+                  {!isOpen && <span className="accordion-summary">{platformSummary(p.key)}</span>}
+                </button>
 
-      {platforms.includes("x") && (
-        <div className="platform-fields">
-          <label htmlFor="x-angle">X — angle style (optional)</label>
-          <select
-            id="x-angle"
-            value={xAngleStyle}
-            onChange={(e) => setXAngleStyle(e.target.value as typeof xAngleStyle)}
-          >
-            <option value="">Let the system pick</option>
-            <option value="hot-take">Hot take — provocative, opinionated</option>
-            <option value="informative">Informative — straight insight</option>
-            <option value="question">Question — put it to the audience</option>
-          </select>
-        </div>
-      )}
+                {isOpen && (
+                  <div className="accordion-body">
+                    {p.key === "linkedin" && (
+                      <>
+                        <label htmlFor="li-audience">Target audience (optional)</label>
+                        <input
+                          id="li-audience"
+                          type="text"
+                          value={linkedinAudience}
+                          onChange={(e) => setLinkedinAudience(e.target.value)}
+                          placeholder="e.g. senior HR leaders, placement officers"
+                        />
+                        <label htmlFor="li-cta">Call to action (optional)</label>
+                        <input
+                          id="li-cta"
+                          type="text"
+                          value={linkedinCta}
+                          onChange={(e) => setLinkedinCta(e.target.value)}
+                          placeholder="e.g. ask readers to share their view"
+                        />
+                      </>
+                    )}
 
-      {includesInstagram && (
-        <div className="platform-fields">
-          <label htmlFor="ig-visual">Instagram — visual style (optional)</label>
-          <select
-            id="ig-visual"
-            value={instagramVisualStyle}
-            onChange={(e) => setInstagramVisualStyle(e.target.value as typeof instagramVisualStyle)}
-          >
-            <option value="">Let the system pick</option>
-            <option value="photography">Photography — realistic scene</option>
-            <option value="illustration">Illustration — minimal, drawn</option>
-            <option value="infographic">Infographic — chart/data visual</option>
-          </select>
-          <div className="pillar-tag" style={{ marginTop: 6 }}>
-            🖼️ Instagram drafts get an AI-generated image attached automatically — no manual upload.
-          </div>
+                    {p.key === "x" && (
+                      <>
+                        <label htmlFor="x-angle">Angle style (optional)</label>
+                        <select
+                          id="x-angle"
+                          value={xAngleStyle}
+                          onChange={(e) => setXAngleStyle(e.target.value as typeof xAngleStyle)}
+                        >
+                          <option value="">Let the system pick</option>
+                          <option value="hot-take">Hot take — provocative, opinionated</option>
+                          <option value="informative">Informative — straight insight</option>
+                          <option value="question">Question — put it to the audience</option>
+                        </select>
+                      </>
+                    )}
+
+                    {p.key === "instagram" && (
+                      <>
+                        <label htmlFor="ig-visual">Visual style (optional)</label>
+                        <select
+                          id="ig-visual"
+                          value={instagramVisualStyle}
+                          onChange={(e) =>
+                            setInstagramVisualStyle(e.target.value as typeof instagramVisualStyle)
+                          }
+                        >
+                          <option value="">Let the system pick</option>
+                          <option value="photography">Photography — realistic scene</option>
+                          <option value="illustration">Illustration — minimal, drawn</option>
+                          <option value="infographic">Infographic — chart/data visual</option>
+                        </select>
+                        <div className="pillar-tag" style={{ marginTop: 6 }}>
+                          🖼️ Instagram drafts get an AI-generated image attached automatically — no
+                          manual upload.
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
