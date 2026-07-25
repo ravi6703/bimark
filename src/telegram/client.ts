@@ -50,6 +50,40 @@ export class TelegramClient {
     return { messageId: (res as { result?: { message_id?: number } })?.result?.message_id ?? null };
   }
 
+  /** Telegram caption limit — sendPhoto rejects longer captions outright. */
+  private static readonly CAPTION_LIMIT = 1024;
+
+  async sendPhoto(opts: {
+    chatId?: string;
+    photoUrl: string;
+    caption: string;
+    buttons?: InlineButton[][];
+  }): Promise<{ messageId: number | null }> {
+    const chatId = opts.chatId ?? config.telegram.chatId;
+    const reply_markup = opts.buttons ? { inline_keyboard: opts.buttons } : undefined;
+    const caption =
+      opts.caption.length > TelegramClient.CAPTION_LIMIT
+        ? `${opts.caption.slice(0, TelegramClient.CAPTION_LIMIT - 1)}…`
+        : opts.caption;
+
+    if (!this.base) {
+      logger.info(
+        { chatId, photoUrl: opts.photoUrl, caption, buttons: opts.buttons },
+        "[telegram:dry-run] would send photo",
+      );
+      return { messageId: null };
+    }
+
+    const res = await this.call("sendPhoto", {
+      chat_id: chatId,
+      photo: opts.photoUrl,
+      caption,
+      parse_mode: "HTML",
+      ...(reply_markup ? { reply_markup } : {}),
+    });
+    return { messageId: (res as { result?: { message_id?: number } })?.result?.message_id ?? null };
+  }
+
   async editMessageText(chatId: string, messageId: number, text: string): Promise<void> {
     if (!this.base) {
       logger.info({ chatId, messageId, text }, "[telegram:dry-run] would edit message");

@@ -4,7 +4,7 @@ import { repurpose } from "../agents/repurpose.js";
 import { review } from "../agents/reviewer.js";
 import { DEFAULT_VOICE_GUIDE, imagePrompt, type TargetPlatform } from "../agents/prompts.js";
 import { brands, drafts, mediaAssets, ownedAssets, pillars, topics } from "../db/repositories/index.js";
-import { getImageGenerator } from "../images/index.js";
+import { buildMediaUrl, getImageGenerator } from "../images/index.js";
 import { retrieve } from "../rag/retrieve.js";
 import { getTelegram } from "../telegram/client.js";
 import { draftPreviewMessage } from "../telegram/messages.js";
@@ -97,9 +97,19 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
     await attachGeneratedImage(draft, topic.angle ?? "", pillarName, brand?.visual_notes ?? null);
   }
 
-  // Step 6 — Telegram approval preview (§9 gate).
+  // Step 6 — Telegram approval preview (§9 gate). Send the generated image
+  // as a photo (caption = preview text) when one is attached, so the editor
+  // can see what will actually post to Instagram before approving.
   const { text, buttons } = draftPreviewMessage(draft);
-  await getTelegram().sendMessage({ text, buttons });
+  if (draft.media_asset_id != null) {
+    await getTelegram().sendPhoto({
+      photoUrl: buildMediaUrl(draft.media_asset_id),
+      caption: text,
+      buttons,
+    });
+  } else {
+    await getTelegram().sendMessage({ text, buttons });
+  }
 
   logger.info({ draftId: draft.id, topicId, lowSource, retries }, "WF-4: draft ready for approval");
   return draft;
