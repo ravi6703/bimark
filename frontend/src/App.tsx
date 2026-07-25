@@ -5,6 +5,7 @@ import { DraftQueue } from "./components/DraftQueue";
 import { NewTopicForm } from "./components/NewTopicForm";
 import { PillarsView } from "./components/PillarsView";
 import { MetricsView } from "./components/MetricsView";
+import { TeamView } from "./components/TeamView";
 
 const TABS = [
   {
@@ -34,6 +35,13 @@ const TABS = [
     icon: "📊",
     title: "Metrics",
     subtitle: "Draft quality trends over time.",
+  },
+  {
+    key: "team",
+    label: "Team",
+    icon: "👥",
+    title: "Team",
+    subtitle: "Who's on the team, and who did what — everyone signs in by name now.",
   },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -131,6 +139,7 @@ export function App() {
         {tab === "new" && <NewTopicForm />}
         {tab === "pillars" && <PillarsView />}
         {tab === "metrics" && <MetricsView />}
+        {tab === "team" && <TeamView />}
       </main>
     </div>
   );

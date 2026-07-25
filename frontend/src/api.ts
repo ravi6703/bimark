@@ -109,15 +109,34 @@ export interface ClarifyQuestion {
   platform: string;
   question: string;
 }
+export interface TeamMember {
+  id: number;
+  name: string;
+  active: boolean;
+  created_at: string;
+}
 
 // ── API calls ─────────────────────────────────────────────────────────────
 export const api = {
-  async login(password: string): Promise<string> {
+  async login(name: string, password: string): Promise<string> {
     const { token } = await request<{ token: string }>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ name, password }),
     });
     return token;
+  },
+
+  async listTeammates(): Promise<TeamMember[]> {
+    const { users } = await request<{ users: TeamMember[] }>("/auth/users");
+    return users;
+  },
+
+  async addTeammate(name: string, password: string): Promise<TeamMember> {
+    const { user } = await request<{ user: TeamMember }>("/auth/users", {
+      method: "POST",
+      body: JSON.stringify({ name, password }),
+    });
+    return user;
   },
 
   async listDrafts(status = "pending_approval"): Promise<Draft[]> {

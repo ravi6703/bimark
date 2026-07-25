@@ -135,6 +135,15 @@ export interface MediaAsset {
   model_used: string | null;
 }
 
+/** A named dashboard account (audit Phase 0 — replaces the shared password). */
+export interface User {
+  id: number;
+  name: string;
+  password_hash: string;
+  active: boolean;
+  created_at: Date;
+}
+
 export interface Post {
   id: number;
   draft_id: number;

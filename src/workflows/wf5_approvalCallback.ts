@@ -4,7 +4,7 @@ import { buildMediaUrl } from "../images/index.js";
 import { editDistance } from "../metrics/editDistance.js";
 import { getPublisher } from "../publish/index.js";
 import { getTelegram } from "../telegram/client.js";
-import type { Draft, Post } from "../types.js";
+import type { Draft, DraftStatus, Post } from "../types.js";
 
 /** Velocity polling window (§7.1): metrics are polled for this long after publish. */
 export const POLL_WINDOW_HOURS = 72;
@@ -48,6 +48,26 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
   if (!draft) throw new Error(`WF-5: draft ${input.draftId} not found`);
   const aiBody = draft.body ?? "";
 
+  const edited =
+    input.decision === "approve" &&
+    input.editedText != null &&
+    input.editedText.trim() !== "" &&
+    input.editedText.trim() !== aiBody.trim();
+
+  // Concurrency guard (audit Phase 0): claim the draft atomically, computing
+  // the final target status up front, before doing anything else. Two
+  // simultaneous finalize calls on the same draft — Telegram racing the
+  // dashboard, or two teammates both clicking Approve — can't both win: the
+  // loser gets null back here instead of a second, duplicate publish.
+  const targetStatus: DraftStatus =
+    input.decision === "reject" ? "rejected" : input.hold ? "approved_hold" : edited ? "edited" : "approved";
+  const claimed = await drafts.claim(draft.id, ["pending_approval"], targetStatus);
+  if (!claimed) {
+    throw new Error(
+      `WF-5: draft ${input.draftId} was already finalized (current status: ${draft.status})`,
+    );
+  }
+
   if (input.decision === "reject") {
     await approvals.log({
       draft_id: draft.id,
@@ -55,17 +75,14 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
       action: "reject",
       reason: input.reason ?? "",
     });
-    await drafts.setStatus(draft.id, "rejected");
     await getTelegram().sendMessage({
-      text: `❌ Rejected.${input.reason ? `\n${input.reason}` : ""}`,
+      text: `❌ Rejected by ${input.approver}.${input.reason ? `\n${input.reason}` : ""}`,
     });
-    logger.info({ draftId: draft.id }, "WF-5: rejected (feeds editorial memo)");
+    logger.info({ draftId: draft.id, approver: input.approver }, "WF-5: rejected (feeds editorial memo)");
     return { action: "reject", editDistance: 0 };
   }
 
   // Approve (optionally with edits).
-  const edited = input.editedText != null && input.editedText.trim() !== "" &&
-    input.editedText.trim() !== aiBody.trim();
   const finalText = edited ? input.editedText!.trim() : aiBody;
   const distance = edited ? editDistance(aiBody, finalText) : 0;
   const action: "approve" | "edit" = edited ? "edit" : "approve";
@@ -79,23 +96,24 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
   if (edited) await drafts.setBody(draft.id, finalText, "edited");
 
   if (input.hold) {
-    await drafts.setStatus(draft.id, "approved_hold");
     await getTelegram().sendMessage({
-      text: `✅ ${action === "edit" ? "Approved with edits" : "Approved"} — holding. Publish it from the dashboard whenever you're ready.`,
+      text: `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — holding. Publish it from the dashboard whenever you're ready.`,
     });
-    logger.info({ draftId: draft.id, action }, "WF-5: approved & held (no auto-publish)");
+    logger.info(
+      { draftId: draft.id, action, approver: input.approver },
+      "WF-5: approved & held (no auto-publish)",
+    );
     return { action, editDistance: distance, held: true };
   }
-  if (!edited) await drafts.setStatus(draft.id, "approved");
 
   const post = await publishNow(draft, finalText, input.scheduledAt ?? null, input.mediaUrls);
 
   await getTelegram().sendMessage({
-    text: `✅ ${action === "edit" ? "Approved with edits" : "Approved"} & ${post.scheduled_at ? "scheduled" : "published"}.${post.url ? `\n${post.url}` : ""}`,
+    text: `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} & ${post.scheduled_at ? "scheduled" : "published"}.${post.url ? `\n${post.url}` : ""}`,
   });
 
   logger.info(
-    { draftId: draft.id, action, editDistance: distance, postId: post.id },
+    { draftId: draft.id, action, approver: input.approver, editDistance: distance, postId: post.id },
     "WF-5: finalized",
   );
   return { action, editDistance: distance, post };
@@ -107,19 +125,24 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
  */
 export async function publishHeldDraft(
   draftId: number,
-  opts: { scheduledAt?: Date | null; mediaUrls?: string[] } = {},
+  opts: { approver: string; scheduledAt?: Date | null; mediaUrls?: string[] },
 ): Promise<Post> {
   const draft = await drafts.get(draftId);
   if (!draft) throw new Error(`WF-5b: draft ${draftId} not found`);
-  if (draft.status !== "approved_hold") {
-    throw new Error(`WF-5b: draft ${draftId} is not held (status: ${draft.status})`);
+
+  // Concurrency guard: the same atomic claim as finalizeDraft, so two people
+  // clicking "Publish now" on the same held draft can't both fire it.
+  const claimed = await drafts.claim(draftId, ["approved_hold"], "approved");
+  if (!claimed) {
+    throw new Error(`WF-5b: draft ${draftId} is not held (current status: ${draft.status})`);
   }
+
   const post = await publishNow(draft, draft.body ?? "", opts.scheduledAt ?? null, opts.mediaUrls);
-  await drafts.setStatus(draftId, "approved");
+  await approvals.log({ draft_id: draftId, approver: opts.approver, action: "publish" });
   await getTelegram().sendMessage({
-    text: `✅ Published (was held).${post.url ? `\n${post.url}` : ""}`,
+    text: `✅ Published by ${opts.approver} (was held).${post.url ? `\n${post.url}` : ""}`,
   });
-  logger.info({ draftId, postId: post.id }, "WF-5b: held draft published");
+  logger.info({ draftId, approver: opts.approver, postId: post.id }, "WF-5b: held draft published");
   return post;
 }
 

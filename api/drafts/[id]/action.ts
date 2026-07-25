@@ -10,7 +10,8 @@ import { finalizeDraft } from "../../../src/workflows/wf5_approvalCallback.js";
  * underlying finalizeDraft, same audit trail, same publish path.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (!requireAuth(req, res)) return;
+  const me = requireAuth(req, res);
+  if (!me) return;
   if (req.method !== "POST") {
     res.status(405).json({ error: "method not allowed" });
     return;
@@ -45,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       reason: typeof req.body?.reason === "string" ? req.body.reason : undefined,
       scheduledAt,
       hold: req.body?.hold === true,
-      approver: "dashboard",
+      approver: me.name,
     });
     res.status(200).json({ ok: true, ...result });
   } catch (err) {

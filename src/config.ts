@@ -119,12 +119,18 @@ export const config = {
   },
 
   admin: {
-    // Shared password gating the dashboard (single-operator "editor-in-chief"
-    // tool, §9 — not a multi-tenant auth system). Unset ⇒ dashboard API
-    // endpoints reject every request (fail closed, not open).
+    // Legacy shared secret. No longer the login credential (see the `users`
+    // table / named-account auth, audit Phase 0) — kept only (a) as the
+    // default token-signing secret below so existing deployments don't need
+    // a new env var, and (b) as the one-time bootstrap password that creates
+    // the very first named account on first login.
     password: str("ADMIN_PASSWORD"),
+    // Signs auth tokens. Independent of any single user's password, so
+    // rotating one person's password doesn't invalidate everyone else's
+    // session. Falls back to ADMIN_PASSWORD so this isn't a required new var.
+    tokenSecret: str("AUTH_TOKEN_SECRET", str("ADMIN_PASSWORD")),
     get enabled() {
-      return this.password !== "";
+      return this.tokenSecret !== "";
     },
   },
 } as const;

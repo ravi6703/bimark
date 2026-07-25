@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { api, setToken } from "../api";
 
 export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -11,7 +12,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
     setError(null);
     setLoading(true);
     try {
-      const token = await api.login(password);
+      const token = await api.login(name, password);
       setToken(token);
       onLoggedIn();
     } catch (err) {
@@ -25,18 +26,21 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
     <div className="login-wrap">
       <form className="login-card" onSubmit={handleSubmit}>
         <h1>Board Infinity Presence</h1>
-        <p>Editor-in-chief dashboard</p>
+        <p>Sign in with your name — first time here uses the team password to set up your account.</p>
         {error && <div className="error-box">{error}</div>}
-        <label htmlFor="pw">Password</label>
+        <label htmlFor="name">Your name</label>
         <input
-          id="pw"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          id="name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           autoFocus
+          placeholder="e.g. Priya"
         />
+        <label htmlFor="pw">Password</label>
+        <input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <div className="row">
-          <button className="btn primary" type="submit" disabled={loading || !password}>
+          <button className="btn primary" type="submit" disabled={loading || !name || !password}>
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </div>

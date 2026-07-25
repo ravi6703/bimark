@@ -11,6 +11,7 @@ import type {
   ReviewerResult,
   Topic,
   TopicStatus,
+  User,
 } from "../../types.js";
 import { query, withTransaction } from "../pool.js";
 
@@ -318,6 +319,21 @@ export const drafts = {
   async setMediaAsset(id: number, mediaAssetId: number): Promise<void> {
     await query("UPDATE drafts SET media_asset_id = $2 WHERE id = $1", [id, mediaAssetId]);
   },
+  /**
+   * Atomic status transition (audit Phase 0 concurrency guard) — the only
+   * safe way to move a draft out of a given status. Two simultaneous actions
+   * on the same draft (Telegram racing the dashboard, or two teammates both
+   * clicking Approve) can't both succeed: whichever loses the race gets null
+   * back instead of a second publish. Compares status as text so the enum
+   * type never needs an array cast on the driver side.
+   */
+  async claim(id: number, fromStatuses: DraftStatus[], toStatus: DraftStatus): Promise<Draft | null> {
+    const { rows } = await query<Draft>(
+      `UPDATE drafts SET status = $2 WHERE id = $1 AND status::text = ANY($3::text[]) RETURNING *`,
+      [id, toStatus, fromStatuses],
+    );
+    return rows[0] ?? null;
+  },
   /** For the dashboard's review queue — joins the topic's angle/pillar for context. */
   async listWithContext(
     brandId: number,
@@ -370,7 +386,7 @@ export const approvals = {
   async log(a: {
     draft_id: number;
     approver: string;
-    action: "approve" | "edit" | "reject";
+    action: "approve" | "edit" | "reject" | "publish";
     reason?: string;
     edit_distance?: number;
   }): Promise<void> {
@@ -491,5 +507,31 @@ export const insights = {
       i.period,
       i.memo,
     ]);
+  },
+};
+
+// ── Users (named-account auth, audit Phase 0) ─────────────────────────────────
+export const users = {
+  async count(): Promise<number> {
+    const { rows } = await query<{ n: string }>("SELECT count(*)::int AS n FROM users");
+    return Number(rows[0]?.n ?? 0);
+  },
+  async getByName(name: string): Promise<User | null> {
+    const { rows } = await query<User>("SELECT * FROM users WHERE name = $1 AND active = true", [name]);
+    return rows[0] ?? null;
+  },
+  async create(u: { name: string; password_hash: string }): Promise<User> {
+    const { rows } = await query<User>(
+      "INSERT INTO users (name, password_hash) VALUES ($1,$2) RETURNING *",
+      [u.name, u.password_hash],
+    );
+    return rows[0]!;
+  },
+  /** Names only — for the "who's on the team" list, never expose password_hash. */
+  async list(): Promise<{ id: number; name: string; active: boolean; created_at: Date }[]> {
+    const { rows } = await query<{ id: number; name: string; active: boolean; created_at: Date }>(
+      "SELECT id, name, active, created_at FROM users ORDER BY id",
+    );
+    return rows;
   },
 };
