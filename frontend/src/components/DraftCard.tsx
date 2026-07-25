@@ -6,14 +6,19 @@ function PlatformBadge({ platform }: { platform: string }) {
   return <span className={`badge ${platform}`}>{platform === "x" ? "X" : platform}</span>;
 }
 
+type PublishMode = "now" | "schedule" | "hold";
+
 export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState(draft.body ?? "");
+  const [mode, setMode] = useState<PublishMode>("now");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const needsImage = draft.platform === "instagram";
   const imageFailed = needsImage && draft.media_asset_id == null;
+  const held = draft.status === "approved_hold";
 
   async function handleApprove() {
     setError(null);
@@ -21,9 +26,17 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
       setError("Image generation failed for this draft — it can't be posted to Instagram as-is.");
       return;
     }
+    if (mode === "schedule" && !scheduledAt) {
+      setError("Pick a date/time to schedule for.");
+      return;
+    }
     setBusy(true);
     try {
-      await api.approveDraft(draft.id, { editedText: editing ? editedText : undefined });
+      await api.approveDraft(draft.id, {
+        editedText: editing ? editedText : undefined,
+        scheduledAt: mode === "schedule" ? new Date(scheduledAt).toISOString() : undefined,
+        hold: mode === "hold",
+      });
       onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Approve failed");
@@ -40,6 +53,19 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
       onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Reject failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePublishHeld() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.publishHeldDraft(draft.id);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Publish failed");
     } finally {
       setBusy(false);
     }
@@ -95,17 +121,75 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
 
       {error && <div className="error-box" style={{ marginTop: 10 }}>{error}</div>}
 
-      <div className="row">
-        <button className="btn primary" onClick={handleApprove} disabled={busy}>
-          ✅ {editing ? "Approve with edits" : "Approve"}
-        </button>
-        <button className="btn" onClick={() => setEditing((v) => !v)} disabled={busy}>
-          ✏️ {editing ? "Cancel edit" : "Edit"}
-        </button>
-        <button className="btn danger" onClick={handleReject} disabled={busy}>
-          ❌ Reject
-        </button>
-      </div>
+      {held ? (
+        <>
+          <div className="meta-note">✅ Approved — held. Publish it yourself whenever you're ready.</div>
+          <div className="row">
+            <button className="btn primary" onClick={handlePublishHeld} disabled={busy}>
+              🚀 {busy ? "Publishing…" : "Publish now"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="publish-mode-row">
+            <label>
+              <input
+                type="radio"
+                name={`mode-${draft.id}`}
+                checked={mode === "now"}
+                onChange={() => setMode("now")}
+              />
+              Publish now
+            </label>
+            <label>
+              <input
+                type="radio"
+                name={`mode-${draft.id}`}
+                checked={mode === "schedule"}
+                onChange={() => setMode("schedule")}
+              />
+              Schedule
+            </label>
+            <label>
+              <input
+                type="radio"
+                name={`mode-${draft.id}`}
+                checked={mode === "hold"}
+                onChange={() => setMode("hold")}
+              />
+              Approve &amp; hold (publish manually later)
+            </label>
+          </div>
+          {mode === "schedule" && (
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              style={{ marginTop: 8 }}
+            />
+          )}
+
+          <div className="row">
+            <button className="btn primary" onClick={handleApprove} disabled={busy}>
+              ✅{" "}
+              {mode === "hold"
+                ? "Approve & hold"
+                : mode === "schedule"
+                  ? "Schedule"
+                  : editing
+                    ? "Approve with edits"
+                    : "Approve"}
+            </button>
+            <button className="btn" onClick={() => setEditing((v) => !v)} disabled={busy}>
+              ✏️ {editing ? "Cancel edit" : "Edit"}
+            </button>
+            <button className="btn danger" onClick={handleReject} disabled={busy}>
+              ❌ Reject
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -28,6 +28,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  const scheduledAtRaw = req.body?.scheduledAt;
+  const scheduledAt =
+    typeof scheduledAtRaw === "string" && scheduledAtRaw ? new Date(scheduledAtRaw) : undefined;
+  if (scheduledAt && Number.isNaN(scheduledAt.getTime())) {
+    res.status(400).json({ error: "invalid scheduledAt" });
+    return;
+  }
+
   try {
     const result = await finalizeDraft({
       draftId,
@@ -35,6 +43,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       editedText: typeof req.body?.editedText === "string" ? req.body.editedText : undefined,
       mediaUrls: Array.isArray(req.body?.mediaUrls) ? req.body.mediaUrls : undefined,
       reason: typeof req.body?.reason === "string" ? req.body.reason : undefined,
+      scheduledAt,
+      hold: req.body?.hold === true,
       approver: "dashboard",
     });
     res.status(200).json({ ok: true, ...result });

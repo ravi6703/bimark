@@ -14,6 +14,7 @@ export type DraftStatus =
   | "flagged"
   | "pending_approval"
   | "approved"
+  | "approved_hold" // approved but held — no platform draft API exists, so it waits here for a manual publish
   | "edited"
   | "rejected";
 export type Platform = "linkedin" | "x" | "instagram";

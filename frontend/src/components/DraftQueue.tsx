@@ -4,6 +4,7 @@ import { DraftCard } from "./DraftCard";
 
 const STATUSES = [
   { key: "pending_approval", label: "Needs review" },
+  { key: "approved_hold", label: "Awaiting publish" },
   { key: "approved", label: "Approved" },
   { key: "edited", label: "Edited" },
   { key: "rejected", label: "Rejected" },

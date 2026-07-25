@@ -261,6 +261,24 @@ label:first-child {
   width: auto;
 }
 
+.publish-mode-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.publish-mode-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+.publish-mode-row input {
+  width: auto;
+}
+
 .empty {
   color: var(--text-dim);
   font-size: 14px;

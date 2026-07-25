@@ -147,11 +147,19 @@ export const api = {
     return request<QualityStats>("/metrics/quality");
   },
 
-  async approveDraft(id: number, opts: { editedText?: string; mediaUrls?: string[] } = {}) {
+  async approveDraft(
+    id: number,
+    opts: { editedText?: string; mediaUrls?: string[]; scheduledAt?: string; hold?: boolean } = {},
+  ) {
     return request(`/drafts/${id}/action`, {
       method: "POST",
       body: JSON.stringify({ decision: "approve", ...opts }),
     });
+  },
+
+  /** Manual publish for a draft approved with hold: true (§20). */
+  async publishHeldDraft(id: number) {
+    return request(`/drafts/${id}/publish`, { method: "POST" });
   },
 
   async rejectDraft(id: number, reason?: string) {

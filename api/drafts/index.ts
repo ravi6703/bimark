@@ -11,6 +11,7 @@ const VALID_STATUSES = new Set<DraftStatus>([
   "flagged",
   "pending_approval",
   "approved",
+  "approved_hold",
   "edited",
   "rejected",
 ]);
