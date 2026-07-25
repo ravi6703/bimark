@@ -2,36 +2,15 @@ import { logger } from "../logger.js";
 import { generateMemo } from "../agents/editorialMemo.js";
 import { insights, pillars, sov } from "../db/repositories/index.js";
 import { query } from "../db/pool.js";
+import { getSovSource, isSovConfigured } from "../sov/index.js";
 import { getTelegram } from "../telegram/client.js";
+
+// Re-exported for backward compatibility — the pluggable source itself now
+// lives in src/sov/ (audit Phase 3), alongside its real Brand24 adapter.
+export { isSovConfigured, setSovSource, NullSovSource, type SovSource } from "../sov/index.js";
 
 /** Competitor set (§19) — the Digital Course Production peer set. */
 export const DEFAULT_COMPETITORS = ["Hurix", "MRCC", "Tesseract", "CommLab", "LetsTute"];
-
-/**
- * A pluggable social-listening source (§19 Proxy 1). Returns a score (mentions +
- * engagement) for a query. Wire this to native LinkedIn/X search or a paid tool
- * (Brand24 / Mention). The default returns 0 — no invented numbers.
- */
-export interface SovSource {
-  score(query: string): Promise<number>;
-}
-export class NullSovSource implements SovSource {
-  async score(): Promise<number> {
-    return 0;
-  }
-}
-let sovSource: SovSource = new NullSovSource();
-export function setSovSource(s: SovSource): void {
-  sovSource = s;
-}
-/**
- * Audit Phase 1: SOV was silently reporting a permanent 0% as if it were real
- * data whenever no listening source was wired up. Exposed here so the memo
- * text and the dashboard can both say "not configured" instead of a bare 0%.
- */
-export function isSovConfigured(): boolean {
-  return !(sovSource instanceof NullSovSource);
-}
 
 /**
  * WF-7a · SOV snapshot (§16 weekly / §19). For each pillar, score BI vs each
@@ -43,6 +22,7 @@ export async function runSovSnapshot(
   brandName: string,
   competitors = DEFAULT_COMPETITORS,
 ): Promise<void> {
+  const sovSource = getSovSource();
   const active = await pillars.listActive(brandId);
   for (const pillar of active) {
     const topic = `${pillar.name}`;
