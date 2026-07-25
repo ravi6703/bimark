@@ -124,6 +124,22 @@ export const config = {
     distinctivenessLookbackDays: int("RAG_DISTINCTIVENESS_LOOKBACK_DAYS", 60),
   },
 
+  // Social-listening source for §19 SOV (audit Phase 3). Unset ⇒ NullSovSource
+  // (honestly reports "not configured" — see isSovConfigured() — rather than
+  // a fabricated 0%). "brand24" activates the real adapter once both
+  // BRAND24_API_KEY and BRAND24_PROJECT_MAP are set.
+  sov: {
+    provider: str("SOV_PROVIDER", "mock"),
+    brand24: {
+      apiKey: str("BRAND24_API_KEY"),
+      // JSON map of tracked entity name -> Brand24 project id/slug, e.g.
+      // {"Board Infinity":"<project-slug>","Hurix":"<project-slug>"} — one
+      // Brand24 project per brand/competitor, configured in your Brand24
+      // account first (see src/sov/brand24.ts for why).
+      projectMapJson: str("BRAND24_PROJECT_MAP", "{}"),
+    },
+  },
+
   quality: {
     firstPassApprovalTarget: num("FIRST_PASS_APPROVAL_TARGET", 0.7),
     // Max reviewer round-trips before escalating a persistently flagged draft (WF-4.4).
