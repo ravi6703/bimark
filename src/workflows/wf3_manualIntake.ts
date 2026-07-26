@@ -16,7 +16,7 @@ import type { Draft } from "../types.js";
  * through the same brand-safety gate. `platform` (singular) is kept for
  * back-compat with earlier callers; `platforms` (plural) is preferred.
  */
-const PLATFORM = z.enum(["linkedin", "x", "instagram"]);
+const PLATFORM = z.enum(["linkedin", "x", "instagram", "geo"]);
 
 /** Structured per-platform guidance (§20) — mirrors src/types.ts#PlatformExtra. */
 const platformDetailsSchema = z.object({
@@ -25,6 +25,9 @@ const platformDetailsSchema = z.object({
   instagram: z
     .object({ visualStyle: z.enum(["photography", "illustration", "infographic"]).optional() })
     .optional(),
+  // GEO (audit follow-up, Okara-inspired) — the exact question this piece
+  // should directly answer, since that's what an AI answer engine extracts.
+  geo: z.object({ targetQuestion: z.string().optional() }).optional(),
 });
 
 export const manualIntakeSchema = z.object({

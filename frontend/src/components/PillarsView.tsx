@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type Brand, type Pillar } from "../api";
+import { OnboardingPanel } from "./OnboardingPanel";
 
 function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => void }) {
   const [voiceGuide, setVoiceGuide] = useState(brand.voice_guide ?? "");
@@ -196,19 +197,22 @@ export function PillarsView() {
   const [brand, setBrand] = useState<Brand | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
     Promise.all([api.listPillars({ all: true }), api.getBrand()])
       .then(([p, b]) => {
         setPillars(p);
         setBrand(b);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load"));
-  }, []);
+  }
+
+  useEffect(load, []);
 
   if (error) return <div className="error-box">{error}</div>;
 
   return (
     <div>
+      <OnboardingPanel onApplied={load} />
       {brand && <BrandEditor brand={brand} onSaved={setBrand} />}
       {pillars.map((p) => (
         <PillarRow

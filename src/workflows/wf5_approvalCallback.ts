@@ -54,13 +54,20 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
     input.editedText.trim() !== "" &&
     input.editedText.trim() !== aiBody.trim();
 
+  // GEO content (Okara-inspired follow-up) has no publish API to auto-post
+  // to — there's no "post to ChatGPT." It always ends in the held state,
+  // regardless of what publish mode was requested; markGeoPosted() below is
+  // its equivalent of publishHeldDraft() once the human has manually placed
+  // it in their own CMS/blog.
+  const hold = input.hold || draft.platform === "geo";
+
   // Concurrency guard (audit Phase 0): claim the draft atomically, computing
   // the final target status up front, before doing anything else. Two
   // simultaneous finalize calls on the same draft — Telegram racing the
   // dashboard, or two teammates both clicking Approve — can't both win: the
   // loser gets null back here instead of a second, duplicate publish.
   const targetStatus: DraftStatus =
-    input.decision === "reject" ? "rejected" : input.hold ? "approved_hold" : edited ? "edited" : "approved";
+    input.decision === "reject" ? "rejected" : hold ? "approved_hold" : edited ? "edited" : "approved";
   const claimed = await drafts.claim(draft.id, ["pending_approval"], targetStatus);
   if (!claimed) {
     throw new Error(
@@ -95,12 +102,14 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
   });
   if (edited) await drafts.setBody(draft.id, finalText, "edited");
 
-  if (input.hold) {
-    await getTelegram().sendMessage({
-      text: `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — holding. Publish it from the dashboard whenever you're ready.`,
-    });
+  if (hold) {
+    const holdMessage =
+      draft.platform === "geo"
+        ? `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — this is GEO content, so there's no platform to auto-publish to. Copy it into your CMS/blog from the dashboard, then mark it posted.`
+        : `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — holding. Publish it from the dashboard whenever you're ready.`;
+    await getTelegram().sendMessage({ text: holdMessage });
     logger.info(
-      { draftId: draft.id, action, approver: input.approver },
+      { draftId: draft.id, action, approver: input.approver, platform: draft.platform },
       "WF-5: approved & held (no auto-publish)",
     );
     return { action, editDistance: distance, held: true };
@@ -129,6 +138,12 @@ export async function publishHeldDraft(
 ): Promise<Post> {
   const draft = await drafts.get(draftId);
   if (!draft) throw new Error(`WF-5b: draft ${draftId} not found`);
+  if (draft.platform === "geo") {
+    throw new Error(
+      `WF-5b: draft ${draftId} is GEO content — there's no platform API to publish to; ` +
+        "use markGeoPosted() once it's been placed in your CMS/blog manually.",
+    );
+  }
 
   // Concurrency guard: the same atomic claim as finalizeDraft, so two people
   // clicking "Publish now" on the same held draft can't both fire it.
@@ -143,6 +158,39 @@ export async function publishHeldDraft(
     text: `✅ Published by ${opts.approver} (was held).${post.url ? `\n${post.url}` : ""}`,
   });
   logger.info({ draftId, approver: opts.approver, postId: post.id }, "WF-5b: held draft published");
+  return post;
+}
+
+/**
+ * GEO's equivalent of publishHeldDraft() (Okara-inspired follow-up). There's
+ * no publish API for "your own website's CMS," so this doesn't call
+ * getPublisher() at all — it just records that the human placed the content
+ * themselves, the same way an Instagram/LinkedIn/X post gets a `posts` row,
+ * so it still shows up in the calendar and posts-per-week rollup.
+ */
+export async function markGeoPosted(draftId: number, approver: string): Promise<Post> {
+  const draft = await drafts.get(draftId);
+  if (!draft) throw new Error(`markGeoPosted: draft ${draftId} not found`);
+  if (draft.platform !== "geo") {
+    throw new Error(`markGeoPosted: draft ${draftId} is not GEO content (platform: ${draft.platform})`);
+  }
+  const claimed = await drafts.claim(draftId, ["approved_hold"], "approved");
+  if (!claimed) {
+    throw new Error(`markGeoPosted: draft ${draftId} is not held (current status: ${draft.status})`);
+  }
+
+  const post = await posts.create({
+    draft_id: draftId,
+    platform: "geo",
+    external_id: null,
+    url: null,
+    scheduled_at: null,
+    published_at: new Date(),
+    poll_until: null, // no platform API to poll analytics from
+  });
+  await approvals.log({ draft_id: draftId, approver, action: "publish" });
+  await getTelegram().sendMessage({ text: `✅ Marked posted by ${approver} (GEO, posted manually).` });
+  logger.info({ draftId, approver }, "WF-5c: GEO draft marked posted");
   return post;
 }
 

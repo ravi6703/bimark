@@ -424,6 +424,27 @@ body {
   font-weight: 600;
 }
 
+/* GEO: not a social card — a direct-answer article snippet. */
+.pv-geo {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+}
+.pv-geo-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.pv-geo-body {
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .card-head {
   display: flex;
   align-items: center;
@@ -453,6 +474,10 @@ body {
 .badge.instagram {
   color: #f9a8d4;
   border-color: #6b3c56;
+}
+.badge.geo {
+  color: #a5e8d0;
+  border-color: #2f6b58;
 }
 .badge.warn {
   color: var(--amber);
@@ -802,6 +827,40 @@ input[type="radio"] {
   color: var(--text-dim);
   font-size: 13px;
   padding: 20px 0;
+}
+
+/* ── AI-derived onboarding (Okara-inspired) ──────────────────────────────── */
+.onboarding-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+.onboarding-proposal {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.onboarding-pillar-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.onboarding-pillar-row input:first-child {
+  flex: 0 0 40%;
+}
+.onboarding-pillar-row input:nth-child(2) {
+  flex: 1;
+}
+.onboarding-pillar-row button {
+  flex: none;
+  padding: 4px 10px;
 }
 
 /* ── Calendar view (audit Phase 2) ────────────────────────────────────── */

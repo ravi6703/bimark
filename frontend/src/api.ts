@@ -134,6 +134,15 @@ export interface PlatformDetails {
   linkedin?: { audience?: string; cta?: string };
   x?: { angleStyle?: "hot-take" | "informative" | "question" };
   instagram?: { visualStyle?: "photography" | "illustration" | "infographic" };
+  /** GEO (generative-engine optimization) — no publish API exists for this; see DraftCard. */
+  geo?: { targetQuestion?: string };
+}
+/** AI-derived onboarding proposal (Okara-inspired) — see OnboardingPanel. */
+export interface OnboardingProposal {
+  voiceGuide: string;
+  visualNotes: string;
+  bannedTopics: string[];
+  pillars: { name: string; description: string }[];
 }
 export interface ClarifyQuestion {
   platform: string;
@@ -260,6 +269,19 @@ export const api = {
   /** Manual publish for a draft approved with hold: true (§20). */
   async publishHeldDraft(id: number) {
     return request(`/drafts/${id}/publish`, { method: "POST" });
+  },
+
+  /** GEO's equivalent of publishHeldDraft — no platform API, just recordkeeping. */
+  async markPosted(id: number) {
+    return request(`/drafts/${id}/mark-posted`, { method: "POST" });
+  },
+
+  async proposeOnboarding(url: string): Promise<OnboardingProposal> {
+    const { proposal } = await request<{ proposal: OnboardingProposal }>("/onboarding/propose", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+    return proposal;
   },
 
   async rejectDraft(id: number, reason?: string) {
