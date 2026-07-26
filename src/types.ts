@@ -286,3 +286,32 @@ export interface SeoAudit {
   checks: SeoCheck[];
   created_at: Date;
 }
+
+/** A real search Reddit is genuinely queried for (Reddit community-engagement
+ * follow-up) — manual, like competitor tracking, not auto-generated. */
+export interface RedditSearchTerm {
+  id: number;
+  brand_id: number;
+  term: string;
+  subreddit: string | null;
+  active: boolean;
+  created_at: Date;
+}
+
+export type RedditOpportunityStatus = "new" | "drafted" | "posted" | "dismissed";
+
+/** A real public Reddit thread found via search — never invented. The
+ * suggested reply (when drafted) is a human-reviewed starting point, copied
+ * out and posted manually; nothing auto-posts. */
+export interface RedditOpportunity {
+  id: number;
+  brand_id: number;
+  search_term_id: number | null;
+  subreddit: string;
+  thread_title: string;
+  thread_url: string;
+  thread_excerpt: string | null;
+  suggested_reply: string | null;
+  status: RedditOpportunityStatus;
+  created_at: Date;
+}

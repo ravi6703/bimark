@@ -251,6 +251,29 @@ export interface SeoAudit {
   created_at: string;
 }
 
+/** Reddit community-engagement agent (Okara-comparison follow-up) —
+ * draft-only: real threads, a drafted reply to review, copy, and post
+ * yourself. Nothing here is ever auto-posted. */
+export interface RedditSearchTerm {
+  id: number;
+  term: string;
+  subreddit: string | null;
+  active: boolean;
+  created_at: string;
+}
+export type RedditOpportunityStatus = "new" | "drafted" | "posted" | "dismissed";
+export interface RedditOpportunity {
+  id: number;
+  search_term_id: number | null;
+  subreddit: string;
+  thread_title: string;
+  thread_url: string;
+  thread_excerpt: string | null;
+  suggested_reply: string | null;
+  status: RedditOpportunityStatus;
+  created_at: string;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────
 export const api = {
   async login(name: string, password: string): Promise<string> {
@@ -511,6 +534,57 @@ export const api = {
       body: JSON.stringify(url ? { url } : {}),
     });
     return audit;
+  },
+
+  async listRedditSearchTerms(): Promise<RedditSearchTerm[]> {
+    const { terms } = await request<{ terms: RedditSearchTerm[] }>("/reddit/search-terms");
+    return terms;
+  },
+
+  async addRedditSearchTerm(term: string, subreddit?: string): Promise<RedditSearchTerm> {
+    const { term: created } = await request<{ term: RedditSearchTerm }>("/reddit/search-terms", {
+      method: "POST",
+      body: JSON.stringify({ term, subreddit: subreddit || undefined }),
+    });
+    return created;
+  },
+
+  async deleteRedditSearchTerm(id: number) {
+    return request(`/reddit/search-terms/${id}`, { method: "DELETE" });
+  },
+
+  async listRedditOpportunities(): Promise<RedditOpportunity[]> {
+    const { opportunities } = await request<{ opportunities: RedditOpportunity[] }>("/reddit/opportunities");
+    return opportunities;
+  },
+
+  /** Manual "find new threads now" — the same search the weekly cron runs. */
+  async checkRedditNow(): Promise<{ checked: number; added: number }> {
+    return request("/reddit/opportunities/check-now", { method: "POST" });
+  },
+
+  async draftRedditReply(id: number): Promise<RedditOpportunity> {
+    const { opportunity } = await request<{ opportunity: RedditOpportunity }>(
+      `/reddit/opportunities/${id}/draft-reply`,
+      { method: "POST" },
+    );
+    return opportunity;
+  },
+
+  async markRedditPosted(id: number): Promise<RedditOpportunity> {
+    const { opportunity } = await request<{ opportunity: RedditOpportunity }>(
+      `/reddit/opportunities/${id}/mark-posted`,
+      { method: "POST" },
+    );
+    return opportunity;
+  },
+
+  async dismissRedditOpportunity(id: number): Promise<RedditOpportunity> {
+    const { opportunity } = await request<{ opportunity: RedditOpportunity }>(
+      `/reddit/opportunities/${id}/dismiss`,
+      { method: "POST" },
+    );
+    return opportunity;
   },
 
   async clarifyTopic(input: {

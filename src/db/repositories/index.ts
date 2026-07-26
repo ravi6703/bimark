@@ -13,6 +13,8 @@ import type {
   Pillar,
   Post,
   PostWithContext,
+  RedditOpportunity,
+  RedditSearchTerm,
   ReviewerResult,
   SeoAudit,
   SeoCheck,
@@ -846,6 +848,92 @@ export const seoAudits = {
       [brandId, limit],
     );
     return rows;
+  },
+};
+
+// ── Reddit community-engagement agent (Okara-comparison follow-up) ─────────
+export const redditSearchTerms = {
+  async list(brandId: number): Promise<RedditSearchTerm[]> {
+    const { rows } = await query<RedditSearchTerm>(
+      "SELECT * FROM reddit_search_terms WHERE brand_id = $1 ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async listActive(brandId: number): Promise<RedditSearchTerm[]> {
+    const { rows } = await query<RedditSearchTerm>(
+      "SELECT * FROM reddit_search_terms WHERE brand_id = $1 AND active = true ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async create(t: { brand_id: number; term: string; subreddit?: string | null }): Promise<RedditSearchTerm> {
+    const { rows } = await query<RedditSearchTerm>(
+      "INSERT INTO reddit_search_terms (brand_id, term, subreddit) VALUES ($1,$2,$3) RETURNING *",
+      [t.brand_id, t.term, t.subreddit ?? null],
+    );
+    return rows[0]!;
+  },
+  async delete(id: number, brandId: number): Promise<boolean> {
+    const { rowCount } = await query(
+      "DELETE FROM reddit_search_terms WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return (rowCount ?? 0) > 0;
+  },
+};
+
+export const redditOpportunities = {
+  async list(brandId: number, limit = 100): Promise<RedditOpportunity[]> {
+    const { rows } = await query<RedditOpportunity>(
+      "SELECT * FROM reddit_opportunities WHERE brand_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [brandId, limit],
+    );
+    return rows;
+  },
+  async get(id: number, brandId: number): Promise<RedditOpportunity | null> {
+    const { rows } = await query<RedditOpportunity>(
+      "SELECT * FROM reddit_opportunities WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return rows[0] ?? null;
+  },
+  async create(o: {
+    brand_id: number;
+    search_term_id: number | null;
+    subreddit: string;
+    thread_title: string;
+    thread_url: string;
+    thread_excerpt: string | null;
+  }): Promise<RedditOpportunity> {
+    const { rows } = await query<RedditOpportunity>(
+      `INSERT INTO reddit_opportunities
+         (brand_id, search_term_id, subreddit, thread_title, thread_url, thread_excerpt)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (thread_url) DO NOTHING
+       RETURNING *`,
+      [o.brand_id, o.search_term_id, o.subreddit, o.thread_title, o.thread_url, o.thread_excerpt],
+    );
+    return rows[0]!;
+  },
+  async setReply(id: number, brandId: number, reply: string): Promise<RedditOpportunity | null> {
+    const { rows } = await query<RedditOpportunity>(
+      `UPDATE reddit_opportunities SET suggested_reply = $3, status = 'drafted'
+       WHERE id = $1 AND brand_id = $2 RETURNING *`,
+      [id, brandId, reply],
+    );
+    return rows[0] ?? null;
+  },
+  async setStatus(
+    id: number,
+    brandId: number,
+    status: "posted" | "dismissed",
+  ): Promise<RedditOpportunity | null> {
+    const { rows } = await query<RedditOpportunity>(
+      "UPDATE reddit_opportunities SET status = $3 WHERE id = $1 AND brand_id = $2 RETURNING *",
+      [id, brandId, status],
+    );
+    return rows[0] ?? null;
   },
 };
 

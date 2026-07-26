@@ -14,6 +14,7 @@ import { CompetitorsView } from "./components/CompetitorsView";
 import { OverviewView } from "./components/OverviewView";
 import { GeoVisibilityView } from "./components/GeoVisibilityView";
 import { SeoAuditView } from "./components/SeoAuditView";
+import { RedditView } from "./components/RedditView";
 
 const TABS = [
   {
@@ -78,6 +79,13 @@ const TABS = [
     icon: "🔧",
     title: "SEO audit",
     subtitle: "A real, rule-based technical audit of your actual site — nothing estimated.",
+  },
+  {
+    key: "reddit",
+    label: "Reddit",
+    icon: "💬",
+    title: "Reddit",
+    subtitle: "Real threads worth joining, with a draft reply to review before you post it yourself.",
   },
   {
     key: "pillars",
@@ -273,6 +281,7 @@ export function App() {
         {tab === "competitors" && <CompetitorsView />}
         {tab === "geo" && <GeoVisibilityView />}
         {tab === "seo" && <SeoAuditView />}
+        {tab === "reddit" && <RedditView />}
         {tab === "pillars" && <PillarsView />}
         {tab === "metrics" && <MetricsView />}
         {tab === "team" && <TeamView />}

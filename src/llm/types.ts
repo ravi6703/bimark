@@ -7,7 +7,8 @@ export type LlmTask =
   | "review" // brand-safety reviewer — strong tier (safety is won here)
   | "memo" // monthly editorial memo — strong tier
   | "onboarding" // AI-derived brand profile proposal — strong tier (sets the whole voice)
-  | "geo_probe"; // GEO citation-tracking probe question — fast tier, high volume, low stakes
+  | "geo_probe" // GEO citation-tracking probe question — fast tier, high volume, low stakes
+  | "reddit_reply"; // Reddit reply draft — fast tier, always human-reviewed before posting
 
 export interface LlmMessage {
   role: "user" | "assistant";
