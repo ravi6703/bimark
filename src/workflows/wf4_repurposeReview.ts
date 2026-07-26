@@ -5,11 +5,13 @@ import { review } from "../agents/reviewer.js";
 import { DEFAULT_VOICE_GUIDE, imagePrompt, type TargetPlatform } from "../agents/prompts.js";
 import { brands, drafts, mediaAssets, ownedAssets, pillars, topics } from "../db/repositories/index.js";
 import { buildMediaUrl, getImageGenerator } from "../images/index.js";
+import { applyLogoWatermark } from "../images/watermark.js";
 import { checkDistinctiveness } from "../rag/distinctiveness.js";
 import { retrieve } from "../rag/retrieve.js";
 import { getTelegram } from "../telegram/client.js";
 import { draftPreviewMessage } from "../telegram/messages.js";
 import type {
+  Brand,
   Draft,
   GeoExtra,
   InstagramExtra,
@@ -141,19 +143,33 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
     logger.warn({ err, draftId: draft.id }, "WF-4: distinctiveness check failed — proceeding without it");
   }
 
-  // Step 5b — Instagram can't post text-only (§20); generate + attach its image now
-  // so the draft arrives in review already postable, no manual URL step.
+  // Step 5b — Instagram can't post text-only (§20), so it always gets one
+  // auto-attached image. LinkedIn can't post text-only either in the sense
+  // that matters here — it CAN, but a multi-image post reads as a real
+  // carousel rather than a wall of text, so it gets its own small gallery
+  // (LinkedIn multi-image follow-up).
   if (platform === "instagram") {
     const visualStyle = (topic.platform_extra as InstagramExtra | null)?.visualStyle;
     const visualNotes = [brand?.visual_notes, visualStyle ? `Visual style: ${visualStyle}.` : null]
       .filter(Boolean)
       .join(" ") || null;
-    await attachGeneratedImage(draft, topic.angle ?? "", pillarName, visualNotes);
+    await attachGeneratedImages(draft, 1, topic.angle ?? "", pillarName, visualNotes, "instagram", brand);
+  } else if (platform === "linkedin") {
+    const visualNotes = brand?.visual_notes ?? null;
+    await attachGeneratedImages(
+      draft,
+      config.image.linkedinImageCount,
+      topic.angle ?? "",
+      pillarName,
+      visualNotes,
+      "linkedin",
+      brand,
+    );
   }
 
   // Step 6 — Telegram approval preview (§9 gate). Send the generated image
   // as a photo (caption = preview text) when one is attached, so the editor
-  // can see what will actually post to Instagram before approving.
+  // can see what will actually post before approving.
   const { text, buttons } = draftPreviewMessage(draft);
   if (draft.media_asset_id != null) {
     await getTelegram().sendPhoto({
@@ -170,56 +186,95 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
 }
 
 /**
- * Generates an Instagram image via the configured provider and attaches it to
- * the draft. Best-effort: a failure here (no key, provider error) is logged
- * and left for the human to notice at approval time (WF-5 still refuses to
- * publish an Instagram draft with no media) rather than blocking the draft.
+ * Generates `count` images via the configured provider, watermarks each with
+ * the brand's real logo when one has been uploaded (brands.logo_data — never
+ * a placeholder mark otherwise), and attaches all of them to the draft.
+ * draft.media_asset_id keeps pointing at the first one generated (the
+ * "cover" image, for back-compat with anything that only knows about one);
+ * the full ordered set lives in the assets table (mediaAssets.listForDraft).
+ * Best-effort: a failure here is logged and left for the human to notice at
+ * approval time (WF-5 still refuses to publish an image-required draft with
+ * no media) rather than blocking the draft.
  */
-async function attachGeneratedImage(
+async function attachGeneratedImages(
   draft: Draft,
+  count: number,
   angle: string,
   pillarName: string,
   visualNotes: string | null,
+  platform: "instagram" | "linkedin",
+  brand: Brand | null,
 ): Promise<void> {
-  try {
-    const prompt = imagePrompt({ angle, pillar: pillarName, visualNotes });
-    const image = await getImageGenerator().generate(prompt);
-    const asset = await mediaAssets.create({
-      draft_id: draft.id,
-      type: "image",
-      mime_type: image.mimeType,
-      data: image.data,
-      model_used: image.modelUsed,
-    });
-    await drafts.setMediaAsset(draft.id, asset.id);
-    draft.media_asset_id = asset.id;
-  } catch (err) {
-    logger.warn({ err, draftId: draft.id }, "WF-4: image generation failed — draft has no media");
+  const logo = brand?.logo_data ? { mimeType: brand.logo_mime_type ?? "image/png", data: brand.logo_data } : null;
+  let firstAssetId: number | null = null;
+  for (let i = 0; i < count; i++) {
+    try {
+      const variationHint =
+        count > 1 ? `Image ${i + 1} of ${count}: a different visual angle/composition than the others, same topic and style.` : null;
+      const prompt = imagePrompt({ angle, pillar: pillarName, visualNotes, platform, variationHint });
+      let image = await getImageGenerator().generate(prompt);
+      if (logo) {
+        image = await applyLogoWatermark(image, logo);
+      }
+      const asset = await mediaAssets.create({
+        draft_id: draft.id,
+        type: "image",
+        mime_type: image.mimeType,
+        data: image.data,
+        model_used: image.modelUsed,
+      });
+      firstAssetId ??= asset.id;
+    } catch (err) {
+      logger.warn({ err, draftId: draft.id, image: i + 1, count }, "WF-4: image generation failed for this slot");
+    }
+  }
+  if (firstAssetId != null) {
+    await drafts.setMediaAsset(draft.id, firstAssetId);
+    draft.media_asset_id = firstAssetId;
   }
 }
 
 /**
- * Regenerate the attached image for an Instagram draft (audit Phase 1 quick
- * win — previously a failed generation was a dead end short of rejecting the
- * whole draft, since the only recourse was passing mediaUrls manually).
+ * Regenerate the attached image(s) for an Instagram or LinkedIn draft (audit
+ * Phase 1 quick win, extended for LinkedIn multi-image) — previously a failed
+ * generation was a dead end short of rejecting the whole draft, since the
+ * only recourse was passing mediaUrls manually. Clears the draft's existing
+ * images first so a LinkedIn regenerate replaces the whole set rather than
+ * piling a second gallery on top of the first.
  */
 export async function regenerateDraftImage(draftId: number): Promise<Draft> {
   const draft = await drafts.get(draftId);
   if (!draft) throw new Error(`regenerateDraftImage: draft ${draftId} not found`);
-  if (draft.platform !== "instagram") {
-    throw new Error("regenerateDraftImage: only Instagram drafts carry a generated image");
+  if (draft.platform !== "instagram" && draft.platform !== "linkedin") {
+    throw new Error("regenerateDraftImage: only Instagram and LinkedIn drafts carry generated images");
   }
   const topic = await topics.get(draft.topic_id);
   if (!topic) throw new Error(`regenerateDraftImage: topic for draft ${draftId} not found`);
   const brand = await brands.get(topic.brand_id);
   const pillarName = await resolvePillarName(topic);
-  const visualStyle = (topic.platform_extra as InstagramExtra | null)?.visualStyle;
-  const visualNotes =
-    [brand?.visual_notes, visualStyle ? `Visual style: ${visualStyle}.` : null]
-      .filter(Boolean)
-      .join(" ") || null;
 
-  await attachGeneratedImage(draft, topic.angle ?? "", pillarName, visualNotes);
+  await mediaAssets.deleteForDraft(draftId);
+  draft.media_asset_id = null;
+
+  if (draft.platform === "instagram") {
+    const visualStyle = (topic.platform_extra as InstagramExtra | null)?.visualStyle;
+    const visualNotes =
+      [brand?.visual_notes, visualStyle ? `Visual style: ${visualStyle}.` : null]
+        .filter(Boolean)
+        .join(" ") || null;
+    await attachGeneratedImages(draft, 1, topic.angle ?? "", pillarName, visualNotes, "instagram", brand);
+  } else {
+    await attachGeneratedImages(
+      draft,
+      config.image.linkedinImageCount,
+      topic.angle ?? "",
+      pillarName,
+      brand?.visual_notes ?? null,
+      "linkedin",
+      brand,
+    );
+  }
+
   if (draft.media_asset_id == null) {
     throw new Error("Image generation failed again — check the image provider's credentials.");
   }
@@ -240,7 +295,7 @@ function normalizePlatform(p: string): TargetPlatform {
 /**
  * Turns structured per-platform guidance (§20) into a plain-language
  * instruction the existing draft prompt already knows how to use (mustSay).
- * Instagram's visual style is handled separately — see attachGeneratedImage.
+ * Instagram's visual style is handled separately — see attachGeneratedImages.
  */
 function extraGuidance(platform: TargetPlatform, extra: Topic["platform_extra"]): string | null {
   if (!extra) return null;

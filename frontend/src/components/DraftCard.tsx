@@ -123,6 +123,14 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
 
   const needsImage = draft.platform === "instagram";
   const imageFailed = needsImage && draft.media_asset_id == null;
+  // LinkedIn generates its own (multi-)image gallery (LinkedIn multi-image
+  // follow-up), but unlike Instagram it can still post text-only — so a
+  // failed generation shows a note and a regenerate option without blocking
+  // Approve the way Instagram's imageFailed does above.
+  const isLinkedin = draft.platform === "linkedin";
+  const linkedinImageCount = draft.media_asset_ids?.length ?? 0;
+  const linkedinImagesFailed = isLinkedin && linkedinImageCount === 0;
+  const canRegenerateImages = needsImage || (isLinkedin && linkedinImageCount > 0);
   const held = draft.status === "approved_hold";
   // GEO has no publish API — there's no "post to ChatGPT" — and YouTube has
   // no video-generation pipeline to produce an actual upload from. Both
@@ -245,6 +253,7 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
           platform={draft.platform}
           body={draft.body ?? ""}
           mediaAssetId={draft.media_asset_id}
+          mediaAssetIds={draft.media_asset_ids}
           brandName={brandName}
         />
       )}
@@ -330,10 +339,10 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
         )}
       </details>
 
-      {needsImage && draft.media_asset_id != null && !editing && (
+      {canRegenerateImages && !editing && (
         <div className="row" style={{ marginTop: -4 }}>
           <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating || busy}>
-            🔄 {regenerating ? "Regenerating…" : "Regenerate image"}
+            🔄 {regenerating ? "Regenerating…" : isLinkedin && linkedinImageCount > 1 ? "Regenerate images" : "Regenerate image"}
           </button>
         </div>
       )}
@@ -343,6 +352,18 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
           <div className="row" style={{ marginTop: -4 }}>
             <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating}>
               🔄 {regenerating ? "Trying again…" : "Try generating again"}
+            </button>
+          </div>
+        </>
+      )}
+      {linkedinImagesFailed && !editing && (
+        <>
+          <div className="meta-note">
+            🖼️ Image generation failed for this post — it'll go out as text-only unless you try again.
+          </div>
+          <div className="row" style={{ marginTop: -4 }}>
+            <button className="btn" type="button" onClick={handleRegenerateImage} disabled={regenerating}>
+              🔄 {regenerating ? "Trying again…" : "Try generating images"}
             </button>
           </div>
         </>
@@ -411,12 +432,17 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
                 </label>
               </fieldset>
               {mode === "schedule" && (
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  style={{ marginTop: 8 }}
-                />
+                <>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    style={{ marginTop: 8 }}
+                  />
+                  <div className="pillar-tag" style={{ marginTop: 4 }}>
+                    Shows up on the Calendar tab for that day once scheduled.
+                  </div>
+                </>
               )}
             </>
           )}

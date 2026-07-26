@@ -29,6 +29,28 @@ describe("Image generation (§20)", () => {
     expect(p).not.toContain("Visual style notes:");
   });
 
+  it("imagePrompt defaults to a square composition and switches to landscape for LinkedIn (multi-image follow-up)", () => {
+    const square = imagePrompt({ angle: "an idea", pillar: "" });
+    expect(square).toContain("Square 1:1 composition");
+
+    const landscape = imagePrompt({ angle: "an idea", pillar: "", platform: "linkedin" });
+    expect(landscape).toContain("Landscape 1.91:1 composition");
+    expect(landscape).not.toContain("Square 1:1");
+  });
+
+  it("imagePrompt includes a per-image variation hint only when one is given", () => {
+    const withHint = imagePrompt({
+      angle: "an idea",
+      pillar: "",
+      platform: "linkedin",
+      variationHint: "Image 2 of 3: a different visual angle/composition than the others, same topic and style.",
+    });
+    expect(withHint).toContain("Image 2 of 3");
+
+    const withoutHint = imagePrompt({ angle: "an idea", pillar: "" });
+    expect(withoutHint).not.toContain("Image");
+  });
+
   it("buildMediaUrl points at the self-hosted media endpoint", () => {
     expect(buildMediaUrl(42)).toMatch(/\/api\/media\/42$/);
   });

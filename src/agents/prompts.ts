@@ -260,19 +260,35 @@ No preamble, no markdown.`;
   return { system, user };
 }
 
-/** §20 — Instagram image generation prompt, built from the post's own grounding. */
+/**
+ * §20 — post-image generation prompt, built from the post's own grounding.
+ * Originally Instagram-only (hence the square default); LinkedIn multi-image
+ * follow-up adds an aspect-ratio switch and an optional per-image variation
+ * hint so a multi-image carousel doesn't generate the same picture N times.
+ * "No logos, no watermarks" is deliberate even though the brand logo does get
+ * added — that happens as a precise post-generation composite (see
+ * src/images/watermark.ts), not by asking the model to draw one, which it
+ * would render inaccurately.
+ */
 export function imagePrompt(input: {
   angle: string;
   pillar: string;
   visualNotes?: string | null;
+  platform?: "instagram" | "linkedin";
+  variationHint?: string | null;
 }): string {
+  const composition =
+    input.platform === "linkedin"
+      ? "Landscape 1.91:1 composition."
+      : "Square 1:1 composition.";
   return [
     "A professional, brand-safe visual for a B2B social media post.",
     `Topic: ${input.angle}.`,
     input.pillar ? `Theme: ${input.pillar}.` : "",
     input.visualNotes ? `Visual style notes: ${input.visualNotes}.` : "",
+    input.variationHint ? input.variationHint : "",
     "Style: clean, modern, editorial photography or minimal illustration. " +
-      "No embedded text, no logos, no watermarks. Square 1:1 composition.",
+      `No embedded text, no logos, no watermarks. ${composition}`,
   ]
     .filter(Boolean)
     .join(" ");

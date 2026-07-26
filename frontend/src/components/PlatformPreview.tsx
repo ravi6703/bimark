@@ -53,11 +53,15 @@ export function PlatformPreview({
   platform,
   body,
   mediaAssetId,
+  mediaAssetIds,
   brandName = "Board Infinity",
 }: {
   platform: string;
   body: string;
   mediaAssetId?: number | null;
+  /** Full ordered image set for a multi-image LinkedIn post; falls back to
+   * just mediaAssetId when absent/empty (older drafts, other platforms). */
+  mediaAssetIds?: number[];
   brandName?: string;
 }) {
   if (platform === "x") {
@@ -136,6 +140,7 @@ export function PlatformPreview({
   }
 
   // Default: LinkedIn.
+  const liImages = mediaAssetIds?.length ? mediaAssetIds : mediaAssetId != null ? [mediaAssetId] : [];
   return (
     <div className="platform-preview pv-linkedin">
       <div className="pv-head">
@@ -146,6 +151,13 @@ export function PlatformPreview({
         </div>
       </div>
       <ExpandableText className="pv-body pv-li-body" limit={LI_TRUNCATE} text={body} />
+      {liImages.length > 0 && (
+        <div className={`pv-li-gallery ${liImages.length > 1 ? "pv-li-gallery-multi" : ""}`}>
+          {liImages.map((id) => (
+            <img key={id} className="pv-li-image" src={`/api/media/${id}`} alt="Generated visual for this post" />
+          ))}
+        </div>
+      )}
       <div className="pv-actions pv-li-actions">
         <span><Icon d={ICONS.thumb} /> Like</span>
         <span><Icon d={ICONS.comment} /> Comment</span>

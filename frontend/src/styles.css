@@ -247,7 +247,8 @@ body {
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
   padding: 18px;
   margin-bottom: 14px;
 }
@@ -427,6 +428,22 @@ body {
 }
 .pv-linkedin .pv-actions {
   border-top: 1px solid #eef1f4;
+}
+/* LinkedIn multi-image gallery — a single image runs full width like a
+   normal feed post; 2+ lay out as LinkedIn's own multi-image grid does. */
+.pv-li-gallery {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+.pv-li-gallery-multi {
+  grid-template-columns: 1fr 1fr;
+}
+.pv-li-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.91 / 1;
+  object-fit: cover;
 }
 
 /* X: dark card, matches X's default dark theme. */
@@ -621,16 +638,22 @@ body {
 
 button.btn {
   border: 1px solid var(--border);
-  background: var(--panel-2);
+  background: var(--panel);
   color: var(--text);
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 button.btn:hover {
-  border-color: var(--text-dim);
+  background: var(--panel-2);
+  border-color: #bfbfbf;
+}
+button.btn:active {
+  background: var(--border-2);
+  border-color: #bfbfbf;
 }
 button.btn.primary {
   background: var(--accent);
@@ -638,7 +661,12 @@ button.btn.primary {
   border-color: var(--accent);
 }
 button.btn.primary:hover {
-  filter: brightness(1.08);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+button.btn.primary:active {
+  background: var(--accent-active);
+  border-color: var(--accent-active);
 }
 button.btn.danger {
   color: var(--red);
@@ -650,17 +678,22 @@ button.btn:disabled {
 
 textarea, input[type="text"], input[type="password"], input[type="url"], select {
   width: 100%;
-  background: var(--panel-2);
+  background: var(--panel);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
   font-family: inherit;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+textarea:hover, input:hover, select:hover {
+  border-color: #bfbfbf;
 }
 textarea:focus, input:focus, select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px #c2e0ff;
 }
 textarea {
   min-height: 90px;
