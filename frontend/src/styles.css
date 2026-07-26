@@ -1,22 +1,26 @@
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --panel-2: #1e222b;
-  --border: #2a2f3a;
-  --text: #e8eaee;
-  --text-dim: #9aa1ae;
-  --accent: #6ea8fe;
-  --green: #4ade80;
-  --amber: #fbbf24;
-  --red: #f87171;
-  color-scheme: dark;
+  /* Light theme (design token handoff) — primary/success/warning/error and
+     surface/text/border tokens map 1:1 to that spec; --panel-2 and the
+     -dim/-active shades are this app's own naming, chosen from the same
+     token family (colorBgLayout / colorTextTertiary / colorPrimaryActive). */
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --panel-2: #fafafa;
+  --border: #d9d9d9;
+  --border-2: #f5f5f5;
+  --text: #262626;
+  --text-dim: #8c8c8c;
+  --accent: #148aff;
+  --accent-hover: #3d9eff;
+  --accent-active: #0073e5;
+  --on-accent: #ffffff;
+  --green: #05c170;
+  --amber: #fca106;
+  --red: #d13845;
+  color-scheme: light;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
 }
-
-/* Native form-control chrome (checkbox/radio/select popover/datetime picker)
-   otherwise renders in light-mode chrome inside this fully dark app — most
-   visible on exactly the controls the review workflow depends on
-   (scheduling, platform-picking). (audit Phase 2 a11y pass) */
 
 * {
   box-sizing: border-box;
@@ -65,7 +69,7 @@ body {
   height: 36px;
   border-radius: 10px;
   background: var(--accent);
-  color: #0b1220;
+  color: var(--on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -127,7 +131,7 @@ body {
 }
 .side-nav button:hover:not(.active) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.03);
 }
 .side-nav-icon {
   font-size: 15px;
@@ -140,7 +144,7 @@ body {
 }
 .nav-badge {
   background: var(--accent);
-  color: #0b1220;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
   border-radius: 999px;
@@ -558,32 +562,32 @@ body {
   color: var(--text-dim);
 }
 .badge.linkedin {
-  color: #6ea8fe;
-  border-color: #2f4a78;
+  color: #0a66c2;
+  border-color: #99ccff;
 }
 .badge.x {
-  color: #e8eaee;
-  border-color: #444;
+  color: #000000;
+  border-color: #d9d9d9;
 }
 .badge.instagram {
-  color: #f9a8d4;
-  border-color: #6b3c56;
+  color: #c13584;
+  border-color: #f5b8da;
 }
 .badge.geo {
-  color: #a5e8d0;
-  border-color: #2f6b58;
+  color: #0f9d78;
+  border-color: #a7e8d0;
 }
 .badge.youtube {
-  color: #ff8a8a;
-  border-color: #6b2f2f;
+  color: #cc0000;
+  border-color: #ffc9c9;
 }
 .badge.warn {
   color: var(--amber);
-  border-color: #6b5417;
+  border-color: #ffd080;
 }
 .badge.flag {
   color: var(--red);
-  border-color: #6b2323;
+  border-color: #f7bbba;
 }
 
 .pillar-tag {
@@ -630,7 +634,7 @@ button.btn:hover {
 }
 button.btn.primary {
   background: var(--accent);
-  color: #0b1220;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 button.btn.primary:hover {
@@ -895,9 +899,9 @@ input[type="radio"] {
 }
 
 .error-box {
-  background: #2a1414;
-  border: 1px solid #6b2323;
-  color: #fca5a5;
+  background: #fff5f5;
+  border: 1px solid #f7bbba;
+  color: #d13845;
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 13px;
@@ -905,9 +909,9 @@ input[type="radio"] {
 }
 
 .success-box {
-  background: #0f2a1a;
-  border: 1px solid #245a3a;
-  color: #86efac;
+  background: #f7fdfa;
+  border: 1px solid #8ce2bd;
+  color: #05c170;
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 13px;
@@ -1066,7 +1070,7 @@ input[type="radio"] {
 }
 .status-tabs button.active {
   background: var(--accent);
-  color: #0b1220;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -1109,7 +1113,7 @@ input[type="radio"] {
 }
 .platform-tabs button.active .platform-tab-count {
   background: var(--accent);
-  color: #0b1220;
+  color: var(--on-accent);
 }
 
 .spinner-text {
@@ -1212,7 +1216,7 @@ input[type="radio"] {
 }
 .cal-day.today .cal-day-num {
   background: var(--accent);
-  color: #0b1220;
+  color: var(--on-accent);
   border-radius: 999px;
 }
 .cal-day-num {
