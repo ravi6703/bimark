@@ -15,8 +15,22 @@ import { OverviewView } from "./components/OverviewView";
 import { GeoVisibilityView } from "./components/GeoVisibilityView";
 import { SeoAuditView } from "./components/SeoAuditView";
 import { RedditView } from "./components/RedditView";
+import { PortfolioView } from "./components/PortfolioView";
 
+/**
+ * `group` sorts a tab under a labeled section in the sidebar instead of a
+ * flat 14-item list (UI/UX pass) — undefined means top-level, above every
+ * section. Order here is also render order, so group members must stay
+ * adjacent.
+ */
 const TABS = [
+  {
+    key: "portfolio",
+    label: "Portfolio",
+    icon: "🌐",
+    title: "Portfolio",
+    subtitle: "Every brand line at a glance, in one place — for a leadership/founder view.",
+  },
   {
     key: "overview",
     label: "Overview",
@@ -30,6 +44,7 @@ const TABS = [
     icon: "📥",
     title: "Review queue",
     subtitle: "Approve, edit, reject, schedule, or hold drafts before they go out.",
+    group: "Workspace",
   },
   {
     key: "calendar",
@@ -37,6 +52,7 @@ const TABS = [
     icon: "📅",
     title: "Calendar",
     subtitle: "Everything scheduled or published, by day.",
+    group: "Workspace",
   },
   {
     key: "new",
@@ -44,6 +60,7 @@ const TABS = [
     icon: "✍️",
     title: "New topic",
     subtitle: "Pick platforms, add context, and generate drafts for review.",
+    group: "Workspace",
   },
   {
     key: "topics",
@@ -51,13 +68,7 @@ const TABS = [
     icon: "💡",
     title: "Topics",
     subtitle: "Every topic the pipeline has suggested or been given, AI and manual alike.",
-  },
-  {
-    key: "insights",
-    label: "Insights",
-    icon: "🗒️",
-    title: "Insights",
-    subtitle: "The monthly editorial memo — what landed, what didn't, and why.",
+    group: "Workspace",
   },
   {
     key: "competitors",
@@ -65,6 +76,7 @@ const TABS = [
     icon: "🕵️",
     title: "Competitors",
     subtitle: "What competitors are doing, and what we can learn from it.",
+    group: "Growth intelligence",
   },
   {
     key: "geo",
@@ -72,6 +84,7 @@ const TABS = [
     icon: "🛰️",
     title: "GEO visibility",
     subtitle: "Real questions sent to Claude, checked for whether your brand actually gets cited.",
+    group: "Growth intelligence",
   },
   {
     key: "seo",
@@ -79,6 +92,7 @@ const TABS = [
     icon: "🔧",
     title: "SEO audit",
     subtitle: "A real, rule-based technical audit of your actual site — nothing estimated.",
+    group: "Growth intelligence",
   },
   {
     key: "reddit",
@@ -86,13 +100,15 @@ const TABS = [
     icon: "💬",
     title: "Reddit",
     subtitle: "Real threads worth joining, with a draft reply to review before you post it yourself.",
+    group: "Growth intelligence",
   },
   {
-    key: "pillars",
-    label: "Pillars & brand",
-    icon: "🧭",
-    title: "Pillars & brand",
-    subtitle: "Your content pillars and brand voice guide.",
+    key: "insights",
+    label: "Insights",
+    icon: "🗒️",
+    title: "Insights",
+    subtitle: "The monthly editorial memo — what landed, what didn't, and why.",
+    group: "Growth intelligence",
   },
   {
     key: "metrics",
@@ -100,6 +116,15 @@ const TABS = [
     icon: "📊",
     title: "Metrics",
     subtitle: "Draft quality trends over time.",
+    group: "Growth intelligence",
+  },
+  {
+    key: "pillars",
+    label: "Pillars & brand",
+    icon: "🧭",
+    title: "Pillars & brand",
+    subtitle: "Your content pillars and brand voice guide.",
+    group: "Settings",
   },
   {
     key: "team",
@@ -107,9 +132,14 @@ const TABS = [
     icon: "👥",
     title: "Team",
     subtitle: "Who's on the team, and who did what — everyone signs in by name now.",
+    group: "Settings",
   },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
+
+function groupOf(t: (typeof TABS)[number]): string | undefined {
+  return "group" in t ? t.group : undefined;
+}
 
 export function App() {
   const [authed, setAuthed] = useState(!!getToken());
@@ -235,22 +265,32 @@ export function App() {
         </div>
 
         <nav className="side-nav" role="navigation" aria-label="Main">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              className={tab === t.key ? "active" : ""}
-              aria-current={tab === t.key ? "page" : undefined}
-              onClick={() => goTo(t.key)}
-            >
-              <span className="side-nav-icon">{t.icon}</span>
-              <span className="side-nav-label">{t.label}</span>
-              {t.key === "queue" && !!pendingCount && (
-                <span className="nav-badge" aria-live="polite" aria-atomic="true">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
-          ))}
+          {TABS.map((t, i) => {
+            // A group's label renders once, right before its first member —
+            // groups sort the sidebar into sections (UI/UX pass) instead of
+            // one flat 14-item list.
+            const group = groupOf(t);
+            const prev = i > 0 ? TABS[i - 1] : undefined;
+            const isFirstInGroup = group && group !== (prev && groupOf(prev));
+            return (
+              <div key={t.key}>
+                {isFirstInGroup && <div className="side-nav-group-label">{group}</div>}
+                <button
+                  className={tab === t.key ? "active" : ""}
+                  aria-current={tab === t.key ? "page" : undefined}
+                  onClick={() => goTo(t.key)}
+                >
+                  <span className="side-nav-icon">{t.icon}</span>
+                  <span className="side-nav-label">{t.label}</span>
+                  {t.key === "queue" && !!pendingCount && (
+                    <span className="nav-badge" aria-live="polite" aria-atomic="true">
+                      {pendingCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
@@ -272,6 +312,14 @@ export function App() {
           <p>{active.subtitle}</p>
         </header>
 
+        {tab === "portfolio" && (
+          <PortfolioView
+            onOpenBrand={(slug) => {
+              handleBrandChange(slug);
+              goTo("overview");
+            }}
+          />
+        )}
         {tab === "overview" && <OverviewView onNavigate={(k) => goTo(k as TabKey)} />}
         {tab === "queue" && <DraftQueue onDraftsChanged={refreshPendingCount} />}
         {tab === "calendar" && <CalendarView />}

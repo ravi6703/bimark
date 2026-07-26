@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type GeoCitationCheck, type GeoCitationSummary, type GeoProbeQuery } from "../api";
 import { EmptyState } from "./EmptyState";
+import { InfoCallout } from "./InfoCallout";
 
 export function GeoVisibilityView() {
   const [queries, setQueries] = useState<GeoProbeQuery[]>([]);
@@ -88,13 +89,19 @@ export function GeoVisibilityView() {
 
   return (
     <div>
-      <div className="callout-box" style={{ marginBottom: 16 }}>
-        {configured
-          ? "🔎 These are real questions genuinely sent to Claude (the engine bimark already has an API key for), checked for whether your brand's name shows up in the answer. This is Claude's actual answer specifically — not a claim about what ChatGPT or Perplexity would say."
-          : "🔎 GEO citation tracking isn't configured yet — set ANTHROPIC_API_KEY to enable it. Nothing here is estimated in the meantime."}
-        {" "}ChatGPT and Perplexity checks aren't built yet — each needs its own paid API key, a call for
-        you to make, not something to fake a result for.
-      </div>
+      <InfoCallout
+        icon="🔎"
+        summary={
+          configured
+            ? "Real questions sent to Claude, checked for whether your brand's name shows up in the answer."
+            : "GEO citation tracking isn't configured yet — set ANTHROPIC_API_KEY to enable it."
+        }
+        detail={
+          "This is Claude's actual answer specifically — not a claim about what ChatGPT or Perplexity " +
+          "would say. Those aren't built yet: each needs its own paid API key, a call for you to make, " +
+          "not something to fake a result for."
+        }
+      />
 
       <div className="card">
         <div className="card-head">

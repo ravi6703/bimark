@@ -346,6 +346,41 @@ export const api = {
     return brands;
   },
 
+  /**
+   * Same numbers OverviewView shows for the selected brand, but for an
+   * explicit brand regardless of which one is currently selected — the
+   * portfolio rollup (founder-facing) needs all brands side by side, not
+   * one switcher click at a time. Overrides x-brand-id per call rather than
+   * touching the stored selection, so it can't race the brand switcher.
+   */
+  async getBrandSummary(brandSlug: string): Promise<{
+    pendingCount: number;
+    postsLast7Days: number;
+    postsPerWeekMin: number;
+    postsPerWeekMax: number;
+    firstPassApprovalRate: number | null;
+    autoMentions: number;
+    sovConfigured: boolean;
+  }> {
+    const headers = { "x-brand-id": brandSlug };
+    const [draftsRes, quality, competitorsRes] = await Promise.all([
+      request<{ drafts: Draft[] }>("/drafts?status=pending_approval", { headers }),
+      request<QualityStats>("/metrics/quality", { headers }),
+      request<{ competitors: CompetitorGroup[]; sovConfigured: boolean }>("/competitors", { headers }),
+    ]);
+    return {
+      pendingCount: draftsRes.drafts.length,
+      postsLast7Days: quality.postsLast7Days,
+      postsPerWeekMin: quality.postsPerWeekMin,
+      postsPerWeekMax: quality.postsPerWeekMax,
+      firstPassApprovalRate: quality.firstPassApprovalRate,
+      autoMentions: competitorsRes.competitors
+        .flatMap((g) => g.notes)
+        .filter((n) => n.added_by === "auto-monitor").length,
+      sovConfigured: competitorsRes.sovConfigured,
+    };
+  },
+
   async updateBrand(input: {
     voice_guide?: string;
     visual_notes?: string;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type SeoAudit } from "../api";
 import { EmptyState } from "./EmptyState";
+import { InfoCallout } from "./InfoCallout";
 
 export function SeoAuditView() {
   const [siteUrl, setSiteUrl] = useState<string | null>(null);
@@ -46,12 +47,14 @@ export function SeoAuditView() {
 
   return (
     <div>
-      <div className="callout-box" style={{ marginBottom: 16 }}>
-        🔧 A real, rule-based audit of your site's actual HTML/robots.txt/sitemap.xml — every check is
-        independently verifiable from what was fetched, nothing estimated. This checks structure, not
-        performance (Core Web Vitals would need a paid API) and doesn't auto-apply any fix — each one is
-        a plain-language instruction for a human to make.
-      </div>
+      <InfoCallout
+        icon="🔧"
+        summary="A real, rule-based audit of your site's actual HTML/robots.txt/sitemap.xml — nothing estimated."
+        detail={
+          "Checks structure, not performance (Core Web Vitals would need a paid API), and doesn't " +
+          "auto-apply any fix — each one is a plain-language instruction for a human to make."
+        }
+      />
 
       <div className="card">
         <div className="card-head">
