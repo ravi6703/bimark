@@ -9,6 +9,7 @@ import { TeamView } from "./components/TeamView";
 import { TopicsView } from "./components/TopicsView";
 import { InsightsView } from "./components/InsightsView";
 import { CalendarView } from "./components/CalendarView";
+import { CompetitorsView } from "./components/CompetitorsView";
 
 const TABS = [
   {
@@ -45,6 +46,13 @@ const TABS = [
     icon: "🗒️",
     title: "Insights",
     subtitle: "The monthly editorial memo — what landed, what didn't, and why.",
+  },
+  {
+    key: "competitors",
+    label: "Competitors",
+    icon: "🕵️",
+    title: "Competitors",
+    subtitle: "What competitors are doing, and what we can learn from it.",
   },
   {
     key: "pillars",
@@ -179,6 +187,7 @@ export function App() {
         {tab === "new" && <NewTopicForm />}
         {tab === "topics" && <TopicsView />}
         {tab === "insights" && <InsightsView />}
+        {tab === "competitors" && <CompetitorsView />}
         {tab === "pillars" && <PillarsView />}
         {tab === "metrics" && <MetricsView />}
         {tab === "team" && <TeamView />}

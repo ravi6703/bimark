@@ -163,6 +163,22 @@ export interface TeamMember {
   created_at: string;
 }
 
+/** Competitor intelligence log (Okara-inspired follow-up). */
+export interface CompetitorNote {
+  id: number;
+  competitor_name: string;
+  source_url: string | null;
+  summary: string;
+  learning: string | null;
+  added_by: string;
+  created_at: string;
+}
+export interface CompetitorGroup {
+  name: string;
+  notes: CompetitorNote[];
+  sovScore: number | null;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────
 export const api = {
   async login(name: string, password: string): Promise<string> {
@@ -327,6 +343,31 @@ export const api = {
       `/topics/recent?${qs}`,
     );
     return recent;
+  },
+
+  async listCompetitors(): Promise<{
+    competitors: CompetitorGroup[];
+    sovConfigured: boolean;
+    sovCapturedAt: string | null;
+  }> {
+    return request("/competitors");
+  },
+
+  async addCompetitorNote(input: {
+    competitor_name: string;
+    summary: string;
+    learning?: string;
+    source_url?: string;
+  }): Promise<CompetitorNote> {
+    const { note } = await request<{ note: CompetitorNote }>("/competitors", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return note;
+  },
+
+  async deleteCompetitorNote(id: number) {
+    return request(`/competitors/${id}`, { method: "DELETE" });
   },
 
   async clarifyTopic(input: {

@@ -202,3 +202,18 @@ export interface BrandProfileProposal {
   bannedTopics: string[];
   pillars: { name: string; description: string }[];
 }
+
+/** Competitor intelligence log entry (Okara-inspired follow-up) — a manual
+ * note about what a named competitor did, and what to learn from it. Not an
+ * auto-refreshing feed; see src/workflows/wf7_sovMemo.ts#DEFAULT_COMPETITORS
+ * for the tracked competitor set and README §12 for why this is manual. */
+export interface CompetitorNote {
+  id: number;
+  brand_id: number;
+  competitor_name: string;
+  source_url: string | null;
+  summary: string;
+  learning: string | null;
+  added_by: string;
+  created_at: Date;
+}
