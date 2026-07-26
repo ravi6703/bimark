@@ -17,6 +17,8 @@ export function CompetitorsView() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [busyDelete, setBusyDelete] = useState<number | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -61,6 +63,25 @@ export function CompetitorsView() {
     }
   }
 
+  async function handleCheckNow() {
+    setChecking(true);
+    setCheckResult(null);
+    setError(null);
+    try {
+      const res = await api.checkCompetitorMentions();
+      setCheckResult(
+        res.added > 0
+          ? `Found ${res.added} new mention${res.added === 1 ? "" : "s"} across ${res.checked} tracked competitor${res.checked === 1 ? "" : "s"}.`
+          : `Checked ${res.checked} tracked competitor${res.checked === 1 ? "" : "s"} — nothing new since last check.`,
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to check for new mentions");
+    } finally {
+      setChecking(false);
+    }
+  }
+
   async function handleDelete(id: number) {
     setBusyDelete(id);
     try {
@@ -79,17 +100,23 @@ export function CompetitorsView() {
         {sovConfigured
           ? `📡 Share-of-voice numbers below are real, from the same weekly SOV snapshot the editorial memo uses${sovCapturedAt ? ` (last captured ${new Date(sovCapturedAt).toLocaleDateString()})` : ""}.`
           : "📡 SOV tracking isn't configured yet, so there are no automatic share-of-voice numbers here."}
-        {" "}This log itself is manual — there's no scraping/monitoring source wired up to
-        auto-populate competitor activity, so it only shows what the team records below.
+        {" "}🔎 News mentions are checked automatically (weekly, or on demand below) — tagged "auto-detected"
+        below. Social media activity still isn't monitored automatically: there's no usable public API for
+        LinkedIn/Instagram, and scraping them isn't something this does — that still needs a paid
+        listening tool if you want it.
       </div>
 
       <div className="card">
         <div className="card-head">
           <strong>Log what a competitor did</strong>
-          <button className="btn" style={{ marginLeft: "auto" }} onClick={() => setOpen((v) => !v)}>
+          <button className="btn" onClick={handleCheckNow} disabled={checking} style={{ marginLeft: "auto" }}>
+            🔎 {checking ? "Checking…" : "Check for new mentions"}
+          </button>
+          <button className="btn" onClick={() => setOpen((v) => !v)}>
             {open ? "Cancel" : "+ Add note"}
           </button>
         </div>
+        {checkResult && <div className="pillar-tag" style={{ marginBottom: 8 }}>{checkResult}</div>}
         {open && (
           <form onSubmit={handleAdd}>
             <label htmlFor="comp-name">Competitor</label>
@@ -171,7 +198,8 @@ export function CompetitorsView() {
               <div key={n.id} className="competitor-note">
                 <div className="competitor-note-head">
                   <span className="pillar-tag">
-                    {new Date(n.created_at).toLocaleDateString()} · logged by {n.added_by}
+                    {new Date(n.created_at).toLocaleDateString()} ·{" "}
+                    {n.added_by === "auto-monitor" ? "🔎 auto-detected" : `logged by ${n.added_by}`}
                   </span>
                   <button
                     className="btn danger"

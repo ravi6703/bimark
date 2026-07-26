@@ -402,6 +402,12 @@ export const api = {
     return request(`/competitors/${id}`, { method: "DELETE" });
   },
 
+  /** Manual "check for new mentions now" (Okara-inspired follow-up) — the
+   * same news-mention check the weekly cron runs, for the selected brand. */
+  async checkCompetitorMentions(): Promise<{ checked: number; added: number }> {
+    return request("/competitors/monitor", { method: "POST" });
+  },
+
   async clarifyTopic(input: {
     topic: string;
     platforms: string[];
