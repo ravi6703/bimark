@@ -43,6 +43,9 @@ export interface Brand {
    * been uploaded yet, so images generate without one (no placeholder mark). */
   logo_mime_type: string | null;
   logo_data: Buffer | null;
+  /** The brand's real website (technical SEO audit follow-up) — what
+   * src/seo/audit.ts actually fetches. NULL until the team sets one. */
+  site_url: string | null;
   created_at: Date;
 }
 
@@ -237,5 +240,78 @@ export interface CompetitorNote {
   summary: string;
   learning: string | null;
   added_by: string;
+  created_at: Date;
+}
+
+/** A real question genuinely sent to an AI answer engine to check whether
+ * this brand gets cited in the response (GEO citation-tracking follow-up) —
+ * distinct from the "geo" content platform, which writes for these engines
+ * but never checked whether it worked. */
+export interface GeoProbeQuery {
+  id: number;
+  brand_id: number;
+  query_text: string;
+  active: boolean;
+  created_at: Date;
+}
+
+/** The real, logged result of actually sending one probe query to one AI
+ * engine — never a synthesized/estimated score. */
+export interface GeoCitationCheck {
+  id: number;
+  brand_id: number;
+  probe_query_id: number;
+  engine: string;
+  mentioned: boolean;
+  response_excerpt: string;
+  model_used: string;
+  checked_at: Date;
+}
+
+/** One real, rule-based technical SEO check against the site's actual HTML —
+ * never an estimated/synthesized result (technical SEO audit follow-up). */
+export interface SeoCheck {
+  label: string;
+  pass: boolean;
+  detail: string;
+  /** Plain-language instruction for a human to apply — nothing auto-applies. */
+  fix: string | null;
+}
+
+export interface SeoAudit {
+  id: number;
+  brand_id: number;
+  url: string;
+  score: number; // 0-100, percentage of checks passed
+  checks: SeoCheck[];
+  created_at: Date;
+}
+
+/** A real search Reddit is genuinely queried for (Reddit community-engagement
+ * follow-up) — manual, like competitor tracking, not auto-generated. */
+export interface RedditSearchTerm {
+  id: number;
+  brand_id: number;
+  term: string;
+  subreddit: string | null;
+  active: boolean;
+  created_at: Date;
+}
+
+export type RedditOpportunityStatus = "new" | "drafted" | "posted" | "dismissed";
+
+/** A real public Reddit thread found via search — never invented. The
+ * suggested reply (when drafted) is a human-reviewed starting point, copied
+ * out and posted manually; nothing auto-posts. */
+export interface RedditOpportunity {
+  id: number;
+  brand_id: number;
+  search_term_id: number | null;
+  subreddit: string;
+  thread_title: string;
+  thread_url: string;
+  thread_excerpt: string | null;
+  suggested_reply: string | null;
+  status: RedditOpportunityStatus;
   created_at: Date;
 }

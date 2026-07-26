@@ -14,6 +14,8 @@
     { "path": "/api/cron/analytics-poll", "schedule": "*/30 * * * *" },
     { "path": "/api/cron/sov", "schedule": "30 3 * * 1" },
     { "path": "/api/cron/editorial-memo", "schedule": "30 3 1 * *" },
-    { "path": "/api/cron/competitor-monitor", "schedule": "0 4 * * 1" }
+    { "path": "/api/cron/competitor-monitor", "schedule": "0 4 * * 1" },
+    { "path": "/api/cron/geo-citation-check", "schedule": "0 5 * * 1" },
+    { "path": "/api/cron/reddit-monitor", "schedule": "0 6 * * 1" }
   ]
 }

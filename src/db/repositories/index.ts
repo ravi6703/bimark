@@ -6,12 +6,18 @@ import type {
   Draft,
   DraftStatus,
   DraftWithContext,
+  GeoCitationCheck,
+  GeoProbeQuery,
   MediaAsset,
   OwnedAsset,
   Pillar,
   Post,
   PostWithContext,
+  RedditOpportunity,
+  RedditSearchTerm,
   ReviewerResult,
+  SeoAudit,
+  SeoCheck,
   Topic,
   TopicStatus,
   User,
@@ -78,6 +84,7 @@ export const brands = {
       banned_topics?: string[];
       ayrshare_api_key?: string;
       ayrshare_profile_key?: string;
+      site_url?: string;
     },
   ): Promise<Brand | null> {
     const { rows } = await query<Brand>(
@@ -86,7 +93,8 @@ export const brands = {
          visual_notes = COALESCE($3, visual_notes),
          banned_topics = COALESCE($4, banned_topics),
          ayrshare_api_key = COALESCE($5, ayrshare_api_key),
-         ayrshare_profile_key = COALESCE($6, ayrshare_profile_key)
+         ayrshare_profile_key = COALESCE($6, ayrshare_profile_key),
+         site_url = COALESCE($7, site_url)
        WHERE id = $1 RETURNING *`,
       [
         id,
@@ -95,6 +103,7 @@ export const brands = {
         b.banned_topics ?? null,
         b.ayrshare_api_key ?? null,
         b.ayrshare_profile_key ?? null,
+        b.site_url ?? null,
       ],
     );
     return rows[0] ?? null;
@@ -744,6 +753,187 @@ export const competitorNotes = {
       [id, brandId],
     );
     return (rowCount ?? 0) > 0;
+  },
+};
+
+// ── GEO citation tracking (closes the loop on the GEO content platform —
+// checks whether the brand actually gets cited, instead of only writing for
+// AI answer engines and hoping) ────────────────────────────────────────────
+export const geoProbeQueries = {
+  async list(brandId: number): Promise<GeoProbeQuery[]> {
+    const { rows } = await query<GeoProbeQuery>(
+      "SELECT * FROM geo_probe_queries WHERE brand_id = $1 ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async listActive(brandId: number): Promise<GeoProbeQuery[]> {
+    const { rows } = await query<GeoProbeQuery>(
+      "SELECT * FROM geo_probe_queries WHERE brand_id = $1 AND active = true ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async create(q: { brand_id: number; query_text: string }): Promise<GeoProbeQuery> {
+    const { rows } = await query<GeoProbeQuery>(
+      "INSERT INTO geo_probe_queries (brand_id, query_text) VALUES ($1,$2) RETURNING *",
+      [q.brand_id, q.query_text],
+    );
+    return rows[0]!;
+  },
+  async delete(id: number, brandId: number): Promise<boolean> {
+    const { rowCount } = await query(
+      "DELETE FROM geo_probe_queries WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return (rowCount ?? 0) > 0;
+  },
+};
+
+export const geoCitationChecks = {
+  async create(c: {
+    brand_id: number;
+    probe_query_id: number;
+    engine: string;
+    mentioned: boolean;
+    response_excerpt: string;
+    model_used: string;
+  }): Promise<GeoCitationCheck> {
+    const { rows } = await query<GeoCitationCheck>(
+      `INSERT INTO geo_citation_checks
+         (brand_id, probe_query_id, engine, mentioned, response_excerpt, model_used)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [c.brand_id, c.probe_query_id, c.engine, c.mentioned, c.response_excerpt, c.model_used],
+    );
+    return rows[0]!;
+  },
+  /** Most recent checks first, for the dashboard's recent-activity log. */
+  async listRecent(brandId: number, limit = 50): Promise<GeoCitationCheck[]> {
+    const { rows } = await query<GeoCitationCheck>(
+      "SELECT * FROM geo_citation_checks WHERE brand_id = $1 ORDER BY checked_at DESC LIMIT $2",
+      [brandId, limit],
+    );
+    return rows;
+  },
+  /** Real mention rate per engine over the last `days` — the actual "GEO
+   * score," never estimated. Empty when nothing's been checked yet. */
+  async summaryByEngine(
+    brandId: number,
+    days = 30,
+  ): Promise<{ engine: string; checked: number; mentioned: number }[]> {
+    const { rows } = await query<{ engine: string; checked: string; mentioned: string }>(
+      `SELECT engine, COUNT(*) AS checked, COUNT(*) FILTER (WHERE mentioned) AS mentioned
+         FROM geo_citation_checks
+        WHERE brand_id = $1 AND checked_at > now() - ($2 || ' days')::interval
+        GROUP BY engine
+        ORDER BY engine`,
+      [brandId, days],
+    );
+    return rows.map((r) => ({ engine: r.engine, checked: Number(r.checked), mentioned: Number(r.mentioned) }));
+  },
+};
+
+// ── Technical SEO audits (Okara-comparison follow-up) ──────────────────────
+export const seoAudits = {
+  async create(a: { brand_id: number; url: string; score: number; checks: SeoCheck[] }): Promise<SeoAudit> {
+    const { rows } = await query<SeoAudit>(
+      "INSERT INTO seo_audits (brand_id, url, score, checks) VALUES ($1,$2,$3,$4) RETURNING *",
+      [a.brand_id, a.url, a.score, JSON.stringify(a.checks)],
+    );
+    return rows[0]!;
+  },
+  async listRecent(brandId: number, limit = 20): Promise<SeoAudit[]> {
+    const { rows } = await query<SeoAudit>(
+      "SELECT * FROM seo_audits WHERE brand_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [brandId, limit],
+    );
+    return rows;
+  },
+};
+
+// ── Reddit community-engagement agent (Okara-comparison follow-up) ─────────
+export const redditSearchTerms = {
+  async list(brandId: number): Promise<RedditSearchTerm[]> {
+    const { rows } = await query<RedditSearchTerm>(
+      "SELECT * FROM reddit_search_terms WHERE brand_id = $1 ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async listActive(brandId: number): Promise<RedditSearchTerm[]> {
+    const { rows } = await query<RedditSearchTerm>(
+      "SELECT * FROM reddit_search_terms WHERE brand_id = $1 AND active = true ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async create(t: { brand_id: number; term: string; subreddit?: string | null }): Promise<RedditSearchTerm> {
+    const { rows } = await query<RedditSearchTerm>(
+      "INSERT INTO reddit_search_terms (brand_id, term, subreddit) VALUES ($1,$2,$3) RETURNING *",
+      [t.brand_id, t.term, t.subreddit ?? null],
+    );
+    return rows[0]!;
+  },
+  async delete(id: number, brandId: number): Promise<boolean> {
+    const { rowCount } = await query(
+      "DELETE FROM reddit_search_terms WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return (rowCount ?? 0) > 0;
+  },
+};
+
+export const redditOpportunities = {
+  async list(brandId: number, limit = 100): Promise<RedditOpportunity[]> {
+    const { rows } = await query<RedditOpportunity>(
+      "SELECT * FROM reddit_opportunities WHERE brand_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [brandId, limit],
+    );
+    return rows;
+  },
+  async get(id: number, brandId: number): Promise<RedditOpportunity | null> {
+    const { rows } = await query<RedditOpportunity>(
+      "SELECT * FROM reddit_opportunities WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return rows[0] ?? null;
+  },
+  async create(o: {
+    brand_id: number;
+    search_term_id: number | null;
+    subreddit: string;
+    thread_title: string;
+    thread_url: string;
+    thread_excerpt: string | null;
+  }): Promise<RedditOpportunity> {
+    const { rows } = await query<RedditOpportunity>(
+      `INSERT INTO reddit_opportunities
+         (brand_id, search_term_id, subreddit, thread_title, thread_url, thread_excerpt)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (thread_url) DO NOTHING
+       RETURNING *`,
+      [o.brand_id, o.search_term_id, o.subreddit, o.thread_title, o.thread_url, o.thread_excerpt],
+    );
+    return rows[0]!;
+  },
+  async setReply(id: number, brandId: number, reply: string): Promise<RedditOpportunity | null> {
+    const { rows } = await query<RedditOpportunity>(
+      `UPDATE reddit_opportunities SET suggested_reply = $3, status = 'drafted'
+       WHERE id = $1 AND brand_id = $2 RETURNING *`,
+      [id, brandId, reply],
+    );
+    return rows[0] ?? null;
+  },
+  async setStatus(
+    id: number,
+    brandId: number,
+    status: "posted" | "dismissed",
+  ): Promise<RedditOpportunity | null> {
+    const { rows } = await query<RedditOpportunity>(
+      "UPDATE reddit_opportunities SET status = $3 WHERE id = $1 AND brand_id = $2 RETURNING *",
+      [id, brandId, status],
+    );
+    return rows[0] ?? null;
   },
 };
 

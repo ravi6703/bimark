@@ -9,8 +9,8 @@ import { brands } from "../../src/db/repositories/index.js";
  * (multi-brand support: which brand is "selected" comes from resolveBrandId,
  * i.e. the dashboard's brand switcher).
  * PATCH /api/brand { voice_guide?, visual_notes?, banned_topics?,
- * ayrshare_api_key?, ayrshare_profile_key? } — edit them (audit Phase 1: this
- * was read-only, requiring a DB edit to change).
+ * ayrshare_api_key?, ayrshare_profile_key?, site_url? } — edit them (audit
+ * Phase 1: this was read-only, requiring a DB edit to change).
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
@@ -28,6 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           typeof req.body?.ayrshare_profile_key === "string"
             ? req.body.ayrshare_profile_key.trim()
             : undefined,
+        site_url: typeof req.body?.site_url === "string" ? req.body.site_url.trim() : undefined,
       });
       if (!brand) {
         res.status(404).json({ error: "no brand configured" });

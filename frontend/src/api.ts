@@ -130,6 +130,8 @@ export interface Brand {
    * watermark generated LinkedIn/Instagram images. The bytes themselves are
    * served from GET /api/brand/logo?brandId=, never inlined here. */
   has_logo: boolean;
+  /** The brand's real website — what the technical SEO audit fetches. */
+  site_url: string | null;
 }
 export interface QualityStats {
   firstPassApprovalRate: number | null;
@@ -210,6 +212,68 @@ export interface CompetitorGroup {
   sovScore: number | null;
 }
 
+/** GEO citation tracking (Okara-comparison follow-up) — real questions sent
+ * to a configured AI engine, checked for whether this brand's name shows up. */
+export interface GeoProbeQuery {
+  id: number;
+  query_text: string;
+  active: boolean;
+  created_at: string;
+}
+export interface GeoCitationSummary {
+  engine: string;
+  checked: number;
+  mentioned: number;
+}
+export interface GeoCitationCheck {
+  id: number;
+  probe_query_id: number;
+  engine: string;
+  mentioned: boolean;
+  response_excerpt: string;
+  model_used: string;
+  checked_at: string;
+}
+
+/** Technical SEO audit (Okara-comparison follow-up) — real, rule-based
+ * checks against the brand's actual site, not an estimated score. */
+export interface SeoCheck {
+  label: string;
+  pass: boolean;
+  detail: string;
+  fix: string | null;
+}
+export interface SeoAudit {
+  id: number;
+  url: string;
+  score: number;
+  checks: SeoCheck[];
+  created_at: string;
+}
+
+/** Reddit community-engagement agent (Okara-comparison follow-up) —
+ * draft-only: real threads, a drafted reply to review, copy, and post
+ * yourself. Nothing here is ever auto-posted. */
+export interface RedditSearchTerm {
+  id: number;
+  term: string;
+  subreddit: string | null;
+  active: boolean;
+  created_at: string;
+}
+export type RedditOpportunityStatus = "new" | "drafted" | "posted" | "dismissed";
+export interface RedditOpportunity {
+  id: number;
+  search_term_id: number | null;
+  subreddit: string;
+  thread_title: string;
+  thread_url: string;
+  thread_excerpt: string | null;
+  suggested_reply: string | null;
+  status: RedditOpportunityStatus;
+  created_at: string;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────
 export const api = {
   async login(name: string, password: string): Promise<string> {
@@ -288,6 +352,7 @@ export const api = {
     banned_topics?: string[];
     ayrshare_api_key?: string;
     ayrshare_profile_key?: string;
+    site_url?: string;
   }): Promise<Brand> {
     const { brand } = await request<{ brand: Brand }>("/brand", {
       method: "PATCH",
@@ -426,6 +491,100 @@ export const api = {
    * same news-mention check the weekly cron runs, for the selected brand. */
   async checkCompetitorMentions(): Promise<{ checked: number; added: number }> {
     return request("/competitors/monitor", { method: "POST" });
+  },
+
+  async listGeoProbeQueries(): Promise<GeoProbeQuery[]> {
+    const { queries } = await request<{ queries: GeoProbeQuery[] }>("/geo/probe-queries");
+    return queries;
+  },
+
+  async addGeoProbeQuery(queryText: string): Promise<GeoProbeQuery> {
+    const { query } = await request<{ query: GeoProbeQuery }>("/geo/probe-queries", {
+      method: "POST",
+      body: JSON.stringify({ query_text: queryText }),
+    });
+    return query;
+  },
+
+  async deleteGeoProbeQuery(id: number) {
+    return request(`/geo/probe-queries/${id}`, { method: "DELETE" });
+  },
+
+  async getGeoCitations(): Promise<{
+    configured: boolean;
+    summary: GeoCitationSummary[];
+    recent: GeoCitationCheck[];
+  }> {
+    return request("/geo/citations");
+  },
+
+  /** Manual "check citation now" — the same check the weekly cron runs. */
+  async checkGeoCitationsNow(): Promise<{ checked: number }> {
+    return request("/geo/citations/check-now", { method: "POST" });
+  },
+
+  async getSeoAudits(): Promise<{ siteUrl: string | null; audits: SeoAudit[] }> {
+    return request("/seo/audits");
+  },
+
+  /** Genuinely fetches the live site right now — not cached/estimated. */
+  async runSeoAudit(url?: string): Promise<SeoAudit> {
+    const { audit } = await request<{ audit: SeoAudit }>("/seo/audits/run", {
+      method: "POST",
+      body: JSON.stringify(url ? { url } : {}),
+    });
+    return audit;
+  },
+
+  async listRedditSearchTerms(): Promise<RedditSearchTerm[]> {
+    const { terms } = await request<{ terms: RedditSearchTerm[] }>("/reddit/search-terms");
+    return terms;
+  },
+
+  async addRedditSearchTerm(term: string, subreddit?: string): Promise<RedditSearchTerm> {
+    const { term: created } = await request<{ term: RedditSearchTerm }>("/reddit/search-terms", {
+      method: "POST",
+      body: JSON.stringify({ term, subreddit: subreddit || undefined }),
+    });
+    return created;
+  },
+
+  async deleteRedditSearchTerm(id: number) {
+    return request(`/reddit/search-terms/${id}`, { method: "DELETE" });
+  },
+
+  async listRedditOpportunities(): Promise<RedditOpportunity[]> {
+    const { opportunities } = await request<{ opportunities: RedditOpportunity[] }>("/reddit/opportunities");
+    return opportunities;
+  },
+
+  /** Manual "find new threads now" — the same search the weekly cron runs. */
+  async checkRedditNow(): Promise<{ checked: number; added: number }> {
+    return request("/reddit/opportunities/check-now", { method: "POST" });
+  },
+
+  async draftRedditReply(id: number): Promise<RedditOpportunity> {
+    const { opportunity } = await request<{ opportunity: RedditOpportunity }>(
+      `/reddit/opportunities/${id}/draft-reply`,
+      { method: "POST" },
+    );
+    return opportunity;
+  },
+
+  async markRedditPosted(id: number): Promise<RedditOpportunity> {
+    const { opportunity } = await request<{ opportunity: RedditOpportunity }>(
+      `/reddit/opportunities/${id}/mark-posted`,
+      { method: "POST" },
+    );
+    return opportunity;
+  },
+
+  async dismissRedditOpportunity(id: number): Promise<RedditOpportunity> {
+    const { opportunity } = await request<{ opportunity: RedditOpportunity }>(
+      `/reddit/opportunities/${id}/dismiss`,
+      { method: "POST" },
+    );
+    return opportunity;
   },
 
   async clarifyTopic(input: {
