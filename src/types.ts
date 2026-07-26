@@ -239,3 +239,28 @@ export interface CompetitorNote {
   added_by: string;
   created_at: Date;
 }
+
+/** A real question genuinely sent to an AI answer engine to check whether
+ * this brand gets cited in the response (GEO citation-tracking follow-up) —
+ * distinct from the "geo" content platform, which writes for these engines
+ * but never checked whether it worked. */
+export interface GeoProbeQuery {
+  id: number;
+  brand_id: number;
+  query_text: string;
+  active: boolean;
+  created_at: Date;
+}
+
+/** The real, logged result of actually sending one probe query to one AI
+ * engine — never a synthesized/estimated score. */
+export interface GeoCitationCheck {
+  id: number;
+  brand_id: number;
+  probe_query_id: number;
+  engine: string;
+  mentioned: boolean;
+  response_excerpt: string;
+  model_used: string;
+  checked_at: Date;
+}

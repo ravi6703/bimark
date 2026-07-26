@@ -12,6 +12,7 @@ import { InsightsView } from "./components/InsightsView";
 import { CalendarView } from "./components/CalendarView";
 import { CompetitorsView } from "./components/CompetitorsView";
 import { OverviewView } from "./components/OverviewView";
+import { GeoVisibilityView } from "./components/GeoVisibilityView";
 
 const TABS = [
   {
@@ -62,6 +63,13 @@ const TABS = [
     icon: "🕵️",
     title: "Competitors",
     subtitle: "What competitors are doing, and what we can learn from it.",
+  },
+  {
+    key: "geo",
+    label: "GEO visibility",
+    icon: "🛰️",
+    title: "GEO visibility",
+    subtitle: "Real questions sent to Claude, checked for whether your brand actually gets cited.",
   },
   {
     key: "pillars",
@@ -255,6 +263,7 @@ export function App() {
         {tab === "topics" && <TopicsView />}
         {tab === "insights" && <InsightsView />}
         {tab === "competitors" && <CompetitorsView />}
+        {tab === "geo" && <GeoVisibilityView />}
         {tab === "pillars" && <PillarsView />}
         {tab === "metrics" && <MetricsView />}
         {tab === "team" && <TeamView />}

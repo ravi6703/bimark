@@ -6,6 +6,8 @@ import type {
   Draft,
   DraftStatus,
   DraftWithContext,
+  GeoCitationCheck,
+  GeoProbeQuery,
   MediaAsset,
   OwnedAsset,
   Pillar,
@@ -744,6 +746,83 @@ export const competitorNotes = {
       [id, brandId],
     );
     return (rowCount ?? 0) > 0;
+  },
+};
+
+// ── GEO citation tracking (closes the loop on the GEO content platform —
+// checks whether the brand actually gets cited, instead of only writing for
+// AI answer engines and hoping) ────────────────────────────────────────────
+export const geoProbeQueries = {
+  async list(brandId: number): Promise<GeoProbeQuery[]> {
+    const { rows } = await query<GeoProbeQuery>(
+      "SELECT * FROM geo_probe_queries WHERE brand_id = $1 ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async listActive(brandId: number): Promise<GeoProbeQuery[]> {
+    const { rows } = await query<GeoProbeQuery>(
+      "SELECT * FROM geo_probe_queries WHERE brand_id = $1 AND active = true ORDER BY created_at DESC",
+      [brandId],
+    );
+    return rows;
+  },
+  async create(q: { brand_id: number; query_text: string }): Promise<GeoProbeQuery> {
+    const { rows } = await query<GeoProbeQuery>(
+      "INSERT INTO geo_probe_queries (brand_id, query_text) VALUES ($1,$2) RETURNING *",
+      [q.brand_id, q.query_text],
+    );
+    return rows[0]!;
+  },
+  async delete(id: number, brandId: number): Promise<boolean> {
+    const { rowCount } = await query(
+      "DELETE FROM geo_probe_queries WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return (rowCount ?? 0) > 0;
+  },
+};
+
+export const geoCitationChecks = {
+  async create(c: {
+    brand_id: number;
+    probe_query_id: number;
+    engine: string;
+    mentioned: boolean;
+    response_excerpt: string;
+    model_used: string;
+  }): Promise<GeoCitationCheck> {
+    const { rows } = await query<GeoCitationCheck>(
+      `INSERT INTO geo_citation_checks
+         (brand_id, probe_query_id, engine, mentioned, response_excerpt, model_used)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [c.brand_id, c.probe_query_id, c.engine, c.mentioned, c.response_excerpt, c.model_used],
+    );
+    return rows[0]!;
+  },
+  /** Most recent checks first, for the dashboard's recent-activity log. */
+  async listRecent(brandId: number, limit = 50): Promise<GeoCitationCheck[]> {
+    const { rows } = await query<GeoCitationCheck>(
+      "SELECT * FROM geo_citation_checks WHERE brand_id = $1 ORDER BY checked_at DESC LIMIT $2",
+      [brandId, limit],
+    );
+    return rows;
+  },
+  /** Real mention rate per engine over the last `days` — the actual "GEO
+   * score," never estimated. Empty when nothing's been checked yet. */
+  async summaryByEngine(
+    brandId: number,
+    days = 30,
+  ): Promise<{ engine: string; checked: number; mentioned: number }[]> {
+    const { rows } = await query<{ engine: string; checked: string; mentioned: string }>(
+      `SELECT engine, COUNT(*) AS checked, COUNT(*) FILTER (WHERE mentioned) AS mentioned
+         FROM geo_citation_checks
+        WHERE brand_id = $1 AND checked_at > now() - ($2 || ' days')::interval
+        GROUP BY engine
+        ORDER BY engine`,
+      [brandId, days],
+    );
+    return rows.map((r) => ({ engine: r.engine, checked: Number(r.checked), mentioned: Number(r.mentioned) }));
   },
 };
 

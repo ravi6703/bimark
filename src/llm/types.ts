@@ -6,7 +6,8 @@ export type LlmTask =
   | "polish" // final copy polish — strong tier
   | "review" // brand-safety reviewer — strong tier (safety is won here)
   | "memo" // monthly editorial memo — strong tier
-  | "onboarding"; // AI-derived brand profile proposal — strong tier (sets the whole voice)
+  | "onboarding" // AI-derived brand profile proposal — strong tier (sets the whole voice)
+  | "geo_probe"; // GEO citation-tracking probe question — fast tier, high volume, low stakes
 
 export interface LlmMessage {
   role: "user" | "assistant";

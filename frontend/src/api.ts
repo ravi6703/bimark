@@ -210,6 +210,29 @@ export interface CompetitorGroup {
   sovScore: number | null;
 }
 
+/** GEO citation tracking (Okara-comparison follow-up) — real questions sent
+ * to a configured AI engine, checked for whether this brand's name shows up. */
+export interface GeoProbeQuery {
+  id: number;
+  query_text: string;
+  active: boolean;
+  created_at: string;
+}
+export interface GeoCitationSummary {
+  engine: string;
+  checked: number;
+  mentioned: number;
+}
+export interface GeoCitationCheck {
+  id: number;
+  probe_query_id: number;
+  engine: string;
+  mentioned: boolean;
+  response_excerpt: string;
+  model_used: string;
+  checked_at: string;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────
 export const api = {
   async login(name: string, password: string): Promise<string> {
@@ -426,6 +449,36 @@ export const api = {
    * same news-mention check the weekly cron runs, for the selected brand. */
   async checkCompetitorMentions(): Promise<{ checked: number; added: number }> {
     return request("/competitors/monitor", { method: "POST" });
+  },
+
+  async listGeoProbeQueries(): Promise<GeoProbeQuery[]> {
+    const { queries } = await request<{ queries: GeoProbeQuery[] }>("/geo/probe-queries");
+    return queries;
+  },
+
+  async addGeoProbeQuery(queryText: string): Promise<GeoProbeQuery> {
+    const { query } = await request<{ query: GeoProbeQuery }>("/geo/probe-queries", {
+      method: "POST",
+      body: JSON.stringify({ query_text: queryText }),
+    });
+    return query;
+  },
+
+  async deleteGeoProbeQuery(id: number) {
+    return request(`/geo/probe-queries/${id}`, { method: "DELETE" });
+  },
+
+  async getGeoCitations(): Promise<{
+    configured: boolean;
+    summary: GeoCitationSummary[];
+    recent: GeoCitationCheck[];
+  }> {
+    return request("/geo/citations");
+  },
+
+  /** Manual "check citation now" — the same check the weekly cron runs. */
+  async checkGeoCitationsNow(): Promise<{ checked: number }> {
+    return request("/geo/citations/check-now", { method: "POST" });
   },
 
   async clarifyTopic(input: {
