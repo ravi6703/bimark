@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type RedditOpportunity, type RedditSearchTerm } from "../api";
 import { EmptyState } from "./EmptyState";
+import { InfoCallout } from "./InfoCallout";
 
 function OpportunityCard({
   opportunity,
@@ -202,12 +203,15 @@ export function RedditView() {
 
   return (
     <div>
-      <div className="callout-box" style={{ marginBottom: 16 }}>
-        💬 Real public threads found via Reddit's own search, for the terms you add below — nothing
-        invented. A drafted reply is a starting point for a human to review and edit; nothing here ever
-        posts automatically. Auto-posting would need a Reddit API app and an account to post through —
-        a real decision for you to make, same as Ayrshare was for social publishing.
-      </div>
+      <InfoCallout
+        icon="💬"
+        summary="Real public threads found via Reddit's own search — nothing invented."
+        detail={
+          "A drafted reply is a starting point for a human to review and edit; nothing here ever posts " +
+          "automatically. Auto-posting would need a Reddit API app and an account to post through — a " +
+          "real decision for you to make, same as Ayrshare was for social publishing."
+        }
+      />
 
       <div className="card">
         <div className="card-head">

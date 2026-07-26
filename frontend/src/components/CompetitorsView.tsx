@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type CompetitorGroup } from "../api";
 import { EmptyState } from "./EmptyState";
+import { InfoCallout } from "./InfoCallout";
 
 export function CompetitorsView() {
   const [groups, setGroups] = useState<CompetitorGroup[]>([]);
@@ -97,15 +98,20 @@ export function CompetitorsView() {
 
   return (
     <div>
-      <div className="callout-box" style={{ marginBottom: 16 }}>
-        {sovConfigured
-          ? `📡 Share-of-voice numbers below are real, from the same weekly SOV snapshot the editorial memo uses${sovCapturedAt ? ` (last captured ${new Date(sovCapturedAt).toLocaleDateString()})` : ""}.`
-          : "📡 SOV tracking isn't configured yet, so there are no automatic share-of-voice numbers here."}
-        {" "}🔎 News mentions are checked automatically (weekly, or on demand below) — tagged "auto-detected"
-        below. Social media activity still isn't monitored automatically: there's no usable public API for
-        LinkedIn/Instagram, and scraping them isn't something this does — that still needs a paid
-        listening tool if you want it.
-      </div>
+      <InfoCallout
+        icon="📡"
+        summary={
+          sovConfigured
+            ? `SOV numbers below are real, from the same weekly snapshot the editorial memo uses${sovCapturedAt ? ` (last captured ${new Date(sovCapturedAt).toLocaleDateString()})` : ""}.`
+            : "SOV tracking isn't configured yet — no automatic share-of-voice numbers here."
+        }
+        detail={
+          'News mentions are checked automatically (weekly, or on demand below) — tagged "auto-detected." ' +
+          "Social media activity isn't monitored automatically: there's no usable public API for " +
+          "LinkedIn/Instagram, and scraping them isn't something this does — that still needs a paid " +
+          "listening tool if you want it."
+        }
+      />
 
       <div className="card">
         <div className="card-head">
