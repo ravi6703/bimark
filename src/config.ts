@@ -81,6 +81,8 @@ export const config = {
     provider: str("IMAGE_PROVIDER", "openrouter") as ImageProvider,
     model: str("IMAGE_MODEL", "google/gemini-2.5-flash-image"),
     size: str("IMAGE_SIZE", "1024x1024"), // only used by the openai provider
+    // LinkedIn supports a multi-image post; Instagram's feed post is single-image.
+    linkedinImageCount: num("IMAGE_COUNT_LINKEDIN", 2),
     openrouter: {
       apiKey: str("OPENROUTER_API_KEY"),
     },
