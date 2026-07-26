@@ -99,6 +99,23 @@ export const brands = {
     );
     return rows[0] ?? null;
   },
+  /** Brand logo upload (LinkedIn multi-image follow-up) — self-hosted the
+   * same way generated media is. Separate from update() since it's binary
+   * and always an explicit replace-or-clear, not a partial-field PATCH. */
+  async setLogo(id: number, mimeType: string, data: Buffer): Promise<Brand | null> {
+    const { rows } = await query<Brand>(
+      "UPDATE brands SET logo_mime_type = $2, logo_data = $3 WHERE id = $1 RETURNING *",
+      [id, mimeType, data],
+    );
+    return rows[0] ?? null;
+  },
+  async clearLogo(id: number): Promise<Brand | null> {
+    const { rows } = await query<Brand>(
+      "UPDATE brands SET logo_mime_type = NULL, logo_data = NULL WHERE id = $1 RETURNING *",
+      [id],
+    );
+    return rows[0] ?? null;
+  },
 };
 
 // ── Pillars ─────────────────────────────────────────────────────────────────
@@ -454,7 +471,11 @@ export const drafts = {
     const { rows } = await query<DraftWithContext>(
       `SELECT d.*, t.angle AS topic_angle, t.brand_id AS brand_id, pl.name AS pillar_name,
               t.why_now AS topic_why_now, t.source AS topic_source,
-              t.format_hint AS topic_format_hint, t.platform_extra AS topic_platform_extra
+              t.format_hint AS topic_format_hint, t.platform_extra AS topic_platform_extra,
+              COALESCE(
+                (SELECT array_agg(a.id ORDER BY a.id) FROM assets a WHERE a.draft_id = d.id),
+                '{}'
+              ) AS media_asset_ids
          FROM drafts d
          JOIN topics t ON t.id = d.topic_id
          LEFT JOIN pillars pl ON pl.id = t.pillar_id
@@ -489,6 +510,19 @@ export const mediaAssets = {
       [id],
     );
     return rows[0] ?? null;
+  },
+  /** Every image generated for a draft, in creation order (LinkedIn
+   * multi-image follow-up) — a draft can now carry more than one. */
+  async listForDraft(draftId: number): Promise<MediaAsset[]> {
+    const { rows } = await query<MediaAsset>(
+      "SELECT id, draft_id, type, mime_type, data, model_used FROM assets WHERE draft_id = $1 ORDER BY id",
+      [draftId],
+    );
+    return rows;
+  },
+  /** Clears a draft's existing images before regenerating a fresh set. */
+  async deleteForDraft(draftId: number): Promise<void> {
+    await query("DELETE FROM assets WHERE draft_id = $1", [draftId]);
   },
 };
 

@@ -1,5 +1,5 @@
 import { logger } from "../logger.js";
-import { approvals, brands, drafts, posts, topics } from "../db/repositories/index.js";
+import { approvals, brands, drafts, mediaAssets, posts, topics } from "../db/repositories/index.js";
 import { buildMediaUrl } from "../images/index.js";
 import { editDistance } from "../metrics/editDistance.js";
 import { getPublisher } from "../publish/index.js";
@@ -230,12 +230,15 @@ async function publishNow(
   mediaUrlsOverride?: string[],
 ): Promise<Post> {
   // Instagram has no text-only post type — Ayrshare rejects it outright. WF-4
-  // auto-generates + attaches an image for every Instagram draft; fall back to
-  // an explicit override if the caller passed one, and fail clearly if neither
-  // exists (image generation failed and nothing was supplied manually).
+  // auto-generates + attaches an image for every Instagram draft (and, since
+  // the LinkedIn multi-image follow-up, up to config.image.linkedinImageCount
+  // for LinkedIn); fall back to an explicit override if the caller passed
+  // one, and fail clearly if neither exists (image generation failed and
+  // nothing was supplied manually).
+  const generatedAssets = mediaUrlsOverride?.length ? [] : await mediaAssets.listForDraft(draft.id);
   const mediaUrls =
     mediaUrlsOverride?.length ? mediaUrlsOverride
-    : draft.media_asset_id != null ? [buildMediaUrl(draft.media_asset_id)]
+    : generatedAssets.length ? generatedAssets.map((a) => buildMediaUrl(a.id))
     : undefined;
   if (draft.platform === "instagram" && !mediaUrls?.length) {
     throw new Error(

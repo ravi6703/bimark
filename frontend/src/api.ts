@@ -75,6 +75,9 @@ export interface Draft {
   claims_used: string[] | null;
   low_source: boolean;
   media_asset_id: number | null;
+  /** Every generated image for this draft, in order (LinkedIn multi-image
+   * follow-up) — media_asset_id above is just the first/"cover" one. */
+  media_asset_ids: number[];
   model_used: string | null;
   prompt_version: string | null;
   reviewer_result: ReviewerResult | null;
@@ -123,6 +126,10 @@ export interface Brand {
    * support follow-up); PATCH /api/brand is write-only for them. */
   has_ayrshare_api_key: boolean;
   has_ayrshare_profile_key: boolean;
+  /** Whether a real logo has been uploaded for this brand — used to
+   * watermark generated LinkedIn/Instagram images. The bytes themselves are
+   * served from GET /api/brand/logo?brandId=, never inlined here. */
+  has_logo: boolean;
 }
 export interface QualityStats {
   firstPassApprovalRate: number | null;
@@ -287,6 +294,19 @@ export const api = {
       body: JSON.stringify(input),
     });
     return brand;
+  },
+
+  /** Public URL for the selected brand's logo — only meaningful if has_logo. */
+  brandLogoUrl(brandId: number): string {
+    return `/api/brand/logo?brandId=${brandId}`;
+  },
+
+  async uploadBrandLogo(file: { data: string; mime_type: string }): Promise<void> {
+    await request("/brand/logo", { method: "POST", body: JSON.stringify(file) });
+  },
+
+  async deleteBrandLogo(): Promise<void> {
+    await request("/brand/logo", { method: "DELETE" });
   },
 
   async getQuality(): Promise<QualityStats> {

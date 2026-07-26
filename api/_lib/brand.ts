@@ -27,10 +27,14 @@ export async function resolveBrandId(req?: VercelRequest): Promise<number> {
  * write-only for these two fields.
  */
 export function redactBrandCredentials(brand: Brand) {
-  const { ayrshare_api_key, ayrshare_profile_key, ...rest } = brand;
+  const { ayrshare_api_key, ayrshare_profile_key, logo_mime_type, logo_data, ...rest } = brand;
   return {
     ...rest,
     has_ayrshare_api_key: !!ayrshare_api_key,
     has_ayrshare_profile_key: !!ayrshare_profile_key,
+    // The logo itself is served from GET /api/brand/logo?brandId=, never
+    // inlined as bytes here (LinkedIn multi-image follow-up) — same posture
+    // as the publish credentials above.
+    has_logo: !!logo_data,
   };
 }

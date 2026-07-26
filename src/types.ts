@@ -38,6 +38,11 @@ export interface Brand {
    * multi-profile plan with a per-brand Profile-Key). */
   ayrshare_api_key: string | null;
   ayrshare_profile_key: string | null;
+  /** Real brand logo, self-hosted the same way generated media is (migration
+   * 011) — used to watermark generated post images. NULL means no logo has
+   * been uploaded yet, so images generate without one (no placeholder mark). */
+  logo_mime_type: string | null;
+  logo_data: Buffer | null;
   created_at: Date;
 }
 
@@ -158,6 +163,10 @@ export interface DraftWithContext extends Draft {
   topic_source: TopicSource | null;
   topic_format_hint: string | null;
   topic_platform_extra: PlatformExtra | null;
+  /** Every generated image for this draft, in creation order (LinkedIn
+   * multi-image follow-up) — media_asset_id above stays the "cover" image
+   * for back-compat; this is the full set, always an array (empty if none). */
+  media_asset_ids: number[];
 }
 
 export interface MediaAsset {

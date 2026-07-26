@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { api, ApiError, type Brand, type Pillar } from "../api";
 import { OnboardingPanel } from "./OnboardingPanel";
 
@@ -117,6 +117,106 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** data:<mime>;base64,XXXX -> just the base64 part the upload API expects. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const idx = result.indexOf(",");
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+const ALLOWED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+/**
+ * Brand logo upload (LinkedIn multi-image follow-up) — this is the real
+ * asset generated images get watermarked with. Nothing is watermarked, and
+ * nothing is invented, until a real logo is uploaded here.
+ */
+function BrandLogoUploader({ brand, onChanged }: { brand: Brand; onChanged: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!ALLOWED_LOGO_TYPES.has(file.type)) {
+      setError("Logo must be a PNG, JPEG, or WebP image.");
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const data = await fileToBase64(file);
+      await api.uploadBrandLogo({ data, mime_type: file.type });
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleRemove() {
+    setUploading(true);
+    setError(null);
+    try {
+      await api.deleteBrandLogo();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Remove failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <strong>Brand logo</strong>
+      </div>
+      <p className="pillar-tag" style={{ marginBottom: 8 }}>
+        Watermarked onto the bottom-right corner of generated LinkedIn/Instagram images,
+        automatically, once set. Images generate without a mark until a real logo is uploaded here
+        — nothing placeholder gets stamped on in the meantime.
+      </p>
+      {brand.has_logo ? (
+        <div className="row" style={{ alignItems: "center", marginBottom: 10 }}>
+          <img
+            src={api.brandLogoUrl(brand.id)}
+            alt={`${brand.name} logo`}
+            style={{ maxWidth: 140, maxHeight: 70, borderRadius: 6, border: "1px solid var(--border)" }}
+          />
+          <button className="btn danger" onClick={handleRemove} disabled={uploading}>
+            {uploading ? "Removing…" : "Remove logo"}
+          </button>
+        </div>
+      ) : (
+        <div className="pillar-tag" style={{ marginBottom: 10 }}>
+          No logo uploaded yet.
+        </div>
+      )}
+      <label className="btn" style={{ cursor: "pointer", display: "inline-block" }}>
+        {uploading ? "Uploading…" : brand.has_logo ? "Replace logo" : "Upload logo"}
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={handleFile}
+          disabled={uploading}
+          style={{ display: "none" }}
+        />
+      </label>
+      {error && <div className="error-box" style={{ marginTop: 10 }}>{error}</div>}
     </div>
   );
 }
@@ -258,6 +358,7 @@ export function PillarsView() {
     <div>
       <OnboardingPanel onApplied={load} />
       {brand && <BrandEditor brand={brand} onSaved={setBrand} />}
+      {brand && <BrandLogoUploader brand={brand} onChanged={load} />}
       {pillars.map((p) => (
         <PillarRow
           key={p.id}

@@ -429,6 +429,22 @@ body {
 .pv-linkedin .pv-actions {
   border-top: 1px solid #eef1f4;
 }
+/* LinkedIn multi-image gallery — a single image runs full width like a
+   normal feed post; 2+ lay out as LinkedIn's own multi-image grid does. */
+.pv-li-gallery {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+.pv-li-gallery-multi {
+  grid-template-columns: 1fr 1fr;
+}
+.pv-li-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.91 / 1;
+  object-fit: cover;
+}
 
 /* X: dark card, matches X's default dark theme. */
 .pv-x {
