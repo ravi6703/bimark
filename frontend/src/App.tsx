@@ -13,6 +13,7 @@ import { CalendarView } from "./components/CalendarView";
 import { CompetitorsView } from "./components/CompetitorsView";
 import { OverviewView } from "./components/OverviewView";
 import { GeoVisibilityView } from "./components/GeoVisibilityView";
+import { SeoAuditView } from "./components/SeoAuditView";
 
 const TABS = [
   {
@@ -70,6 +71,13 @@ const TABS = [
     icon: "🛰️",
     title: "GEO visibility",
     subtitle: "Real questions sent to Claude, checked for whether your brand actually gets cited.",
+  },
+  {
+    key: "seo",
+    label: "SEO audit",
+    icon: "🔧",
+    title: "SEO audit",
+    subtitle: "A real, rule-based technical audit of your actual site — nothing estimated.",
   },
   {
     key: "pillars",
@@ -264,6 +272,7 @@ export function App() {
         {tab === "insights" && <InsightsView />}
         {tab === "competitors" && <CompetitorsView />}
         {tab === "geo" && <GeoVisibilityView />}
+        {tab === "seo" && <SeoAuditView />}
         {tab === "pillars" && <PillarsView />}
         {tab === "metrics" && <MetricsView />}
         {tab === "team" && <TeamView />}

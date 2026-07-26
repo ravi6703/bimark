@@ -6,6 +6,7 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
   const [voiceGuide, setVoiceGuide] = useState(brand.voice_guide ?? "");
   const [visualNotes, setVisualNotes] = useState(brand.visual_notes ?? "");
   const [bannedTopics, setBannedTopics] = useState((brand.banned_topics ?? []).join(", "));
+  const [siteUrl, setSiteUrl] = useState(brand.site_url ?? "");
   const [ayrshareApiKey, setAyrshareApiKey] = useState("");
   const [ayrshareProfileKey, setAyrshareProfileKey] = useState("");
   const [editing, setEditing] = useState(false);
@@ -24,6 +25,7 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
+        site_url: siteUrl.trim(),
         // Only send these if the operator actually typed something — an
         // empty field must never overwrite an already-configured credential.
         ayrshare_api_key: ayrshareApiKey.trim() || undefined,
@@ -59,6 +61,14 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
           <textarea id="visual" rows={3} value={visualNotes} onChange={(e) => setVisualNotes(e.target.value)} />
           <label htmlFor="banned">Banned topics (comma-separated)</label>
           <input id="banned" type="text" value={bannedTopics} onChange={(e) => setBannedTopics(e.target.value)} />
+          <label htmlFor="site-url">Website (used by the technical SEO audit)</label>
+          <input
+            id="site-url"
+            type="text"
+            value={siteUrl}
+            onChange={(e) => setSiteUrl(e.target.value)}
+            placeholder="e.g. https://www.boardinfinity.com"
+          />
 
           <div className="pillar-tag" style={{ marginTop: 14, marginBottom: 4, fontWeight: 700 }}>
             Publish accounts (Ayrshare)
@@ -104,6 +114,9 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
           {brand.banned_topics && brand.banned_topics.length > 0 && (
             <div className="pillar-tag">Banned topics: {brand.banned_topics.join(", ")}</div>
           )}
+          <div className="pillar-tag">
+            Website: {brand.site_url || "not set (used by the technical SEO audit)"}
+          </div>
           <div className="pillar-tag">
             Publish accounts:{" "}
             {brand.has_ayrshare_api_key || brand.has_ayrshare_profile_key

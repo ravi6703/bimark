@@ -14,6 +14,8 @@ import type {
   Post,
   PostWithContext,
   ReviewerResult,
+  SeoAudit,
+  SeoCheck,
   Topic,
   TopicStatus,
   User,
@@ -80,6 +82,7 @@ export const brands = {
       banned_topics?: string[];
       ayrshare_api_key?: string;
       ayrshare_profile_key?: string;
+      site_url?: string;
     },
   ): Promise<Brand | null> {
     const { rows } = await query<Brand>(
@@ -88,7 +91,8 @@ export const brands = {
          visual_notes = COALESCE($3, visual_notes),
          banned_topics = COALESCE($4, banned_topics),
          ayrshare_api_key = COALESCE($5, ayrshare_api_key),
-         ayrshare_profile_key = COALESCE($6, ayrshare_profile_key)
+         ayrshare_profile_key = COALESCE($6, ayrshare_profile_key),
+         site_url = COALESCE($7, site_url)
        WHERE id = $1 RETURNING *`,
       [
         id,
@@ -97,6 +101,7 @@ export const brands = {
         b.banned_topics ?? null,
         b.ayrshare_api_key ?? null,
         b.ayrshare_profile_key ?? null,
+        b.site_url ?? null,
       ],
     );
     return rows[0] ?? null;
@@ -823,6 +828,24 @@ export const geoCitationChecks = {
       [brandId, days],
     );
     return rows.map((r) => ({ engine: r.engine, checked: Number(r.checked), mentioned: Number(r.mentioned) }));
+  },
+};
+
+// ── Technical SEO audits (Okara-comparison follow-up) ──────────────────────
+export const seoAudits = {
+  async create(a: { brand_id: number; url: string; score: number; checks: SeoCheck[] }): Promise<SeoAudit> {
+    const { rows } = await query<SeoAudit>(
+      "INSERT INTO seo_audits (brand_id, url, score, checks) VALUES ($1,$2,$3,$4) RETURNING *",
+      [a.brand_id, a.url, a.score, JSON.stringify(a.checks)],
+    );
+    return rows[0]!;
+  },
+  async listRecent(brandId: number, limit = 20): Promise<SeoAudit[]> {
+    const { rows } = await query<SeoAudit>(
+      "SELECT * FROM seo_audits WHERE brand_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [brandId, limit],
+    );
+    return rows;
   },
 };
 

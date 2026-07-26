@@ -43,6 +43,9 @@ export interface Brand {
    * been uploaded yet, so images generate without one (no placeholder mark). */
   logo_mime_type: string | null;
   logo_data: Buffer | null;
+  /** The brand's real website (technical SEO audit follow-up) — what
+   * src/seo/audit.ts actually fetches. NULL until the team sets one. */
+  site_url: string | null;
   created_at: Date;
 }
 
@@ -263,4 +266,23 @@ export interface GeoCitationCheck {
   response_excerpt: string;
   model_used: string;
   checked_at: Date;
+}
+
+/** One real, rule-based technical SEO check against the site's actual HTML —
+ * never an estimated/synthesized result (technical SEO audit follow-up). */
+export interface SeoCheck {
+  label: string;
+  pass: boolean;
+  detail: string;
+  /** Plain-language instruction for a human to apply — nothing auto-applies. */
+  fix: string | null;
+}
+
+export interface SeoAudit {
+  id: number;
+  brand_id: number;
+  url: string;
+  score: number; // 0-100, percentage of checks passed
+  checks: SeoCheck[];
+  created_at: Date;
 }

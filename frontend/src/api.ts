@@ -130,6 +130,8 @@ export interface Brand {
    * watermark generated LinkedIn/Instagram images. The bytes themselves are
    * served from GET /api/brand/logo?brandId=, never inlined here. */
   has_logo: boolean;
+  /** The brand's real website — what the technical SEO audit fetches. */
+  site_url: string | null;
 }
 export interface QualityStats {
   firstPassApprovalRate: number | null;
@@ -233,6 +235,22 @@ export interface GeoCitationCheck {
   checked_at: string;
 }
 
+/** Technical SEO audit (Okara-comparison follow-up) — real, rule-based
+ * checks against the brand's actual site, not an estimated score. */
+export interface SeoCheck {
+  label: string;
+  pass: boolean;
+  detail: string;
+  fix: string | null;
+}
+export interface SeoAudit {
+  id: number;
+  url: string;
+  score: number;
+  checks: SeoCheck[];
+  created_at: string;
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────
 export const api = {
   async login(name: string, password: string): Promise<string> {
@@ -311,6 +329,7 @@ export const api = {
     banned_topics?: string[];
     ayrshare_api_key?: string;
     ayrshare_profile_key?: string;
+    site_url?: string;
   }): Promise<Brand> {
     const { brand } = await request<{ brand: Brand }>("/brand", {
       method: "PATCH",
@@ -479,6 +498,19 @@ export const api = {
   /** Manual "check citation now" — the same check the weekly cron runs. */
   async checkGeoCitationsNow(): Promise<{ checked: number }> {
     return request("/geo/citations/check-now", { method: "POST" });
+  },
+
+  async getSeoAudits(): Promise<{ siteUrl: string | null; audits: SeoAudit[] }> {
+    return request("/seo/audits");
+  },
+
+  /** Genuinely fetches the live site right now — not cached/estimated. */
+  async runSeoAudit(url?: string): Promise<SeoAudit> {
+    const { audit } = await request<{ audit: SeoAudit }>("/seo/audits/run", {
+      method: "POST",
+      body: JSON.stringify(url ? { url } : {}),
+    });
+    return audit;
   },
 
   async clarifyTopic(input: {
