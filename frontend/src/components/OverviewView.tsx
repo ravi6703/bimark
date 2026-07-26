@@ -87,7 +87,7 @@ export function OverviewView({ onNavigate }: { onNavigate: (tab: string) => void
 
           <div className="stat-grid" style={{ marginTop: 12 }}>
             <StatTile
-              icon="🔎"
+              icon="🕵️"
               tone={autoMentions > 0 ? "accent" : "neutral"}
               value={autoMentions}
               label="Competitor mentions auto-detected"
@@ -103,9 +103,6 @@ export function OverviewView({ onNavigate }: { onNavigate: (tab: string) => void
           <div className="row" style={{ marginTop: 20 }}>
             <button className="btn primary" onClick={() => onNavigate("queue")}>
               📥 Go to review queue
-            </button>
-            <button className="btn" onClick={() => onNavigate("new")}>
-              ✍️ New topic
             </button>
             <button className="btn" onClick={() => onNavigate("competitors")}>
               🕵️ Competitors

@@ -55,12 +55,17 @@ const TABS = [
     group: "Workspace",
   },
   {
+    // Deliberately not in a nav group — a create-action doesn't belong
+    // alongside "places to look at things" (UI/UX pass). Reachable via the
+    // persistent "+ New topic" button in the page header instead; `hidden`
+    // just keeps it out of the sidebar loop below while still working as a
+    // normal tab (routing, page title, Overview's own button into it).
     key: "new",
     label: "New topic",
     icon: "✍️",
     title: "New topic",
     subtitle: "Pick platforms, add context, and generate drafts for review.",
-    group: "Workspace",
+    hidden: true,
   },
   {
     key: "topics",
@@ -80,9 +85,9 @@ const TABS = [
   },
   {
     key: "geo",
-    label: "GEO visibility",
+    label: "AI search visibility",
     icon: "🛰️",
-    title: "GEO visibility",
+    title: "AI search visibility (GEO)",
     subtitle: "Real questions sent to Claude, checked for whether your brand actually gets cited.",
     group: "Growth intelligence",
   },
@@ -140,10 +145,17 @@ type TabKey = (typeof TABS)[number]["key"];
 function groupOf(t: (typeof TABS)[number]): string | undefined {
   return "group" in t ? t.group : undefined;
 }
+function isHidden(t: (typeof TABS)[number]): boolean {
+  return "hidden" in t && t.hidden === true;
+}
+const VISIBLE_TABS = TABS.filter((t) => !isHidden(t));
 
 export function App() {
   const [authed, setAuthed] = useState(!!getToken());
-  const [tab, setTab] = useState<TabKey>("overview");
+  // Lands on the cross-brand Portfolio rollup rather than one brand's
+  // Overview — the more useful first screen once there's more than one
+  // brand line to show (UI/UX pass).
+  const [tab, setTab] = useState<TabKey>("portfolio");
   const [navOpen, setNavOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
 
@@ -265,12 +277,12 @@ export function App() {
         </div>
 
         <nav className="side-nav" role="navigation" aria-label="Main">
-          {TABS.map((t, i) => {
+          {VISIBLE_TABS.map((t, i) => {
             // A group's label renders once, right before its first member —
             // groups sort the sidebar into sections (UI/UX pass) instead of
             // one flat 14-item list.
             const group = groupOf(t);
-            const prev = i > 0 ? TABS[i - 1] : undefined;
+            const prev = i > 0 ? VISIBLE_TABS[i - 1] : undefined;
             const isFirstInGroup = group && group !== (prev && groupOf(prev));
             return (
               <div key={t.key}>
@@ -308,8 +320,15 @@ export function App() {
 
       <main className="main-content" key={selectedBrand ?? "no-brand"}>
         <header className="page-header">
-          <h1>{active.title}</h1>
-          <p>{active.subtitle}</p>
+          <div>
+            <h1>{active.title}</h1>
+            <p>{active.subtitle}</p>
+          </div>
+          {tab !== "new" && tab !== "portfolio" && (
+            <button className="btn primary new-topic-cta" onClick={() => goTo("new")}>
+              ✍️ New topic
+            </button>
+          )}
         </header>
 
         {tab === "portfolio" && (
