@@ -11,8 +11,16 @@ import { TopicsView } from "./components/TopicsView";
 import { InsightsView } from "./components/InsightsView";
 import { CalendarView } from "./components/CalendarView";
 import { CompetitorsView } from "./components/CompetitorsView";
+import { OverviewView } from "./components/OverviewView";
 
 const TABS = [
+  {
+    key: "overview",
+    label: "Overview",
+    icon: "🏠",
+    title: "Overview",
+    subtitle: "Where things stand right now for this brand.",
+  },
   {
     key: "queue",
     label: "Review queue",
@@ -81,7 +89,7 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export function App() {
   const [authed, setAuthed] = useState(!!getToken());
-  const [tab, setTab] = useState<TabKey>("queue");
+  const [tab, setTab] = useState<TabKey>("overview");
   const [navOpen, setNavOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
 
@@ -240,6 +248,7 @@ export function App() {
           <p>{active.subtitle}</p>
         </header>
 
+        {tab === "overview" && <OverviewView onNavigate={(k) => goTo(k as TabKey)} />}
         {tab === "queue" && <DraftQueue onDraftsChanged={refreshPendingCount} />}
         {tab === "calendar" && <CalendarView />}
         {tab === "new" && <NewTopicForm />}

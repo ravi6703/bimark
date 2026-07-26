@@ -109,6 +109,7 @@ body {
   width: 100%;
   background: transparent;
   border: none;
+  border-left: 2px solid transparent;
   color: var(--text-dim);
   padding: 10px 12px;
   border-radius: 8px;
@@ -116,10 +117,13 @@ body {
   font-size: 13px;
   font-weight: 500;
   text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 .side-nav button.active {
   background: var(--panel-2);
   color: var(--text);
+  border-left-color: var(--accent);
+  font-weight: 600;
 }
 .side-nav button:hover:not(.active) {
   color: var(--text);
@@ -952,6 +956,81 @@ input[type="radio"] {
   font-size: 12px;
   color: var(--text-dim);
   margin-top: 4px;
+}
+
+/* StatTile — Okara-inspired dashboard polish: icon + color-coded value,
+   used on Overview and Metrics instead of a flat number-only card. */
+.stat-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color 0.15s ease;
+}
+.stat-tile:hover {
+  border-color: var(--text-dim);
+}
+.stat-tile-icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.stat-tile-icon.tone-green { background: color-mix(in srgb, var(--green) 18%, transparent); }
+.stat-tile-icon.tone-amber { background: color-mix(in srgb, var(--amber) 18%, transparent); }
+.stat-tile-icon.tone-red { background: color-mix(in srgb, var(--red) 18%, transparent); }
+.stat-tile-icon.tone-accent { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.stat-tile-icon.tone-neutral { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
+.stat-tile-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+}
+.stat-tile-value.tone-green { color: var(--green); }
+.stat-tile-value.tone-amber { color: var(--amber); }
+.stat-tile-value.tone-red { color: var(--red); }
+.stat-tile-value.tone-accent { color: var(--accent); }
+.stat-tile-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* EmptyState — Okara-inspired dashboard polish: a real "nothing here yet"
+   explanation instead of a bare 0/— that reads as broken. */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.empty-state-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.empty-state-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: 420px;
+  margin: 0 auto 16px;
+  line-height: 1.5;
 }
 
 .queue-toolbar {

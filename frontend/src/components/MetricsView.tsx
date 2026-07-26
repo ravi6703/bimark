@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type QualityStats } from "../api";
+import { StatTile, type StatTone } from "./StatTile";
+import { EmptyState } from "./EmptyState";
 
 function pct(n: number | null): string {
   return n == null ? "—" : `${Math.round(n * 100)}%`;
@@ -20,6 +22,12 @@ export function MetricsView() {
   if (!stats) return <div className="spinner-text">Loading…</div>;
 
   const onCadence = stats.postsLast7Days >= stats.postsPerWeekMin;
+  const approvalTone: StatTone =
+    stats.firstPassApprovalRate == null
+      ? "neutral"
+      : stats.firstPassApprovalRate >= stats.target
+        ? "green"
+        : "amber";
 
   return (
     <div>
@@ -27,43 +35,41 @@ export function MetricsView() {
         §7 — whether drafts are good enough to use with light edits. Target:{" "}
         {pct(stats.target)} first-pass approval.
       </p>
-      <div className="stat-grid">
-        <div className="stat">
-          <div
-            className="value"
-            style={{ color: onCadence ? "var(--green)" : "var(--amber)" }}
-          >
-            {stats.postsLast7Days}
-          </div>
-          <div className="label">
-            Posts published, last 7 days (target {stats.postsPerWeekMin}–{stats.postsPerWeekMax}/week)
-          </div>
+
+      {stats.sample === 0 ? (
+        <EmptyState
+          icon="📊"
+          title="No activity recorded yet"
+          description="These numbers come from real approvals, edits, and rejections — nothing's been reviewed for this brand yet, so there's nothing to show. Approve or edit a few drafts in the Review queue and this fills in."
+        />
+      ) : (
+        <div className="stat-grid">
+          <StatTile
+            icon="📅"
+            tone={onCadence ? "green" : "amber"}
+            value={stats.postsLast7Days}
+            label={`Posts published, last 7 days (target ${stats.postsPerWeekMin}–${stats.postsPerWeekMax}/week)`}
+          />
+          <StatTile
+            icon="✅"
+            tone={approvalTone}
+            value={pct(stats.firstPassApprovalRate)}
+            label="First-pass approval rate"
+          />
+          <StatTile
+            icon="✏️"
+            tone="neutral"
+            value={stats.meanEditDistance == null ? "—" : Math.round(stats.meanEditDistance)}
+            label="Mean edit distance (chars)"
+          />
+          <StatTile
+            icon="🗂️"
+            tone="neutral"
+            value={stats.sample}
+            label="Approvals + edits + rejects logged"
+          />
         </div>
-        <div className="stat">
-          <div
-            className="value"
-            style={{
-              color:
-                stats.firstPassApprovalRate != null && stats.firstPassApprovalRate >= stats.target
-                  ? "var(--green)"
-                  : "var(--amber)",
-            }}
-          >
-            {pct(stats.firstPassApprovalRate)}
-          </div>
-          <div className="label">First-pass approval rate</div>
-        </div>
-        <div className="stat">
-          <div className="value">
-            {stats.meanEditDistance == null ? "—" : Math.round(stats.meanEditDistance)}
-          </div>
-          <div className="label">Mean edit distance (chars)</div>
-        </div>
-        <div className="stat">
-          <div className="value">{stats.sample}</div>
-          <div className="label">Approvals + edits + rejects logged</div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
