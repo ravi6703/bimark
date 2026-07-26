@@ -1,4 +1,12 @@
-export interface PublishRequest {
+/** Per-brand publish credential override (multi-brand support follow-up) —
+ * lets each brand post through its own connected social accounts instead of
+ * one shared set. Undefined/absent means "use the shared/global config." */
+export interface PublishCredentials {
+  apiKeyOverride?: string;
+  profileKey?: string;
+}
+
+export interface PublishRequest extends PublishCredentials {
   platform: string; // 'linkedin'
   text: string;
   mediaUrls?: string[];
@@ -28,5 +36,5 @@ export interface PostMetrics {
 export interface Publisher {
   readonly name: string;
   publish(req: PublishRequest): Promise<PublishResult>;
-  fetchMetrics(externalId: string): Promise<PostMetrics | null>;
+  fetchMetrics(externalId: string, creds?: PublishCredentials): Promise<PostMetrics | null>;
 }

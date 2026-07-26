@@ -1,10 +1,28 @@
 import { logger } from "../logger.js";
-import { approvals, drafts, posts } from "../db/repositories/index.js";
+import { approvals, brands, drafts, posts, topics } from "../db/repositories/index.js";
 import { buildMediaUrl } from "../images/index.js";
 import { editDistance } from "../metrics/editDistance.js";
 import { getPublisher } from "../publish/index.js";
+import type { PublishCredentials } from "../publish/types.js";
 import { getTelegram } from "../telegram/client.js";
 import type { Draft, DraftStatus, Platform, Post } from "../types.js";
+
+/**
+ * Per-brand publish credentials (multi-brand support follow-up) — each brand
+ * can connect its own social accounts instead of posting through the shared
+ * default (see db/migrations/010_brand_publish_credentials.sql). Falls back
+ * to "no override" for any brand that hasn't had its own connected.
+ */
+async function brandPublishCreds(topicId: number): Promise<PublishCredentials> {
+  const topic = await topics.get(topicId);
+  if (!topic) return {};
+  const brand = await brands.get(topic.brand_id);
+  if (!brand) return {};
+  return {
+    apiKeyOverride: brand.ayrshare_api_key ?? undefined,
+    profileKey: brand.ayrshare_profile_key ?? undefined,
+  };
+}
 
 /**
  * Platforms with no "post to X" API to call — GEO has no platform to post
@@ -226,11 +244,13 @@ async function publishNow(
     );
   }
 
+  const creds = await brandPublishCreds(draft.topic_id);
   const result = await getPublisher().publish({
     platform: draft.platform,
     text,
     scheduledAt,
     mediaUrls,
+    ...creds,
   });
 
   const now = new Date();

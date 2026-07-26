@@ -12,6 +12,21 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+/**
+ * Selected brand workspace (multi-brand support) — Board Infinity runs
+ * several distinct brand lines (Leadup Universe, InfyLearn, Elearning
+ * Solutions, alongside Board Infinity's own). Sent as x-brand-id on every
+ * request so the API knows which brand's data to read/write.
+ */
+const BRAND_KEY = "bimark_brand_slug";
+
+export function getSelectedBrandSlug(): string | null {
+  return localStorage.getItem(BRAND_KEY);
+}
+export function setSelectedBrandSlug(slug: string): void {
+  localStorage.setItem(BRAND_KEY, slug);
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -23,11 +38,13 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const token = getToken();
+  const brandSlug = getSelectedBrandSlug();
   const res = await fetch(`/api${path}`, {
     ...opts,
     headers: {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(brandSlug ? { "x-brand-id": brandSlug } : {}),
       ...opts.headers,
     },
   });
@@ -96,9 +113,16 @@ export interface Pillar {
 export interface Brand {
   id: number;
   name: string;
+  slug: string;
   voice_guide: string | null;
   visual_notes: string | null;
   banned_topics: string[] | null;
+  default_competitors: string[] | null;
+  /** Whether this brand has its own publish credentials configured — the
+   * secret values themselves never round-trip to the browser (multi-brand
+   * support follow-up); PATCH /api/brand is write-only for them. */
+  has_ayrshare_api_key: boolean;
+  has_ayrshare_profile_key: boolean;
 }
 export interface QualityStats {
   firstPassApprovalRate: number | null;
@@ -245,10 +269,18 @@ export const api = {
     return brand;
   },
 
+  /** Every brand workspace (multi-brand support) — for the brand switcher. */
+  async listBrands(): Promise<Brand[]> {
+    const { brands } = await request<{ brands: Brand[] }>("/brands");
+    return brands;
+  },
+
   async updateBrand(input: {
     voice_guide?: string;
     visual_notes?: string;
     banned_topics?: string[];
+    ayrshare_api_key?: string;
+    ayrshare_profile_key?: string;
   }): Promise<Brand> {
     const { brand } = await request<{ brand: Brand }>("/brand", {
       method: "PATCH",

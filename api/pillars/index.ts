@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === "GET") {
     try {
-      const brandId = await resolveBrandId();
+      const brandId = await resolveBrandId(req);
       // ?all=true (management view) includes deactivated pillars; the default
       // (topic-creation pickers) only ever offers active ones.
       const rows =
@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     try {
-      const brandId = await resolveBrandId();
+      const brandId = await resolveBrandId(req);
       const pillar = await pillars.create({
         brand_id: brandId,
         name,

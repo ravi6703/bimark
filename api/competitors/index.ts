@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "../_lib/requireAuth.js";
 import { resolveBrandId } from "../_lib/brand.js";
 import { logger } from "../../src/logger.js";
-import { competitorNotes, sov } from "../../src/db/repositories/index.js";
+import { brands, competitorNotes, sov } from "../../src/db/repositories/index.js";
 import { DEFAULT_COMPETITORS, isSovConfigured } from "../../src/workflows/wf7_sovMemo.js";
 import { groupCompetitorNotes } from "../../src/competitors/group.js";
 
@@ -23,12 +23,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === "GET") {
     try {
-      const brandId = await resolveBrandId();
-      const [notes, latestSov] = await Promise.all([
+      const brandId = await resolveBrandId(req);
+      const [brand, notes, latestSov] = await Promise.all([
+        brands.get(brandId),
         competitorNotes.list(brandId),
         isSovConfigured() ? sov.latestCompetitorScores(brandId) : Promise.resolve(null),
       ]);
-      const groups = groupCompetitorNotes(DEFAULT_COMPETITORS, notes, latestSov?.scores ?? null);
+      // Each brand competes with different companies — use its own tracked
+      // set (multi-brand support), falling back to the original single list
+      // only for a brand that hasn't had one configured yet.
+      const tracked = brand?.default_competitors?.length ? brand.default_competitors : DEFAULT_COMPETITORS;
+      const groups = groupCompetitorNotes(tracked, notes, latestSov?.scores ?? null);
       res.status(200).json({
         ok: true,
         competitors: groups,
@@ -51,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     try {
-      const brandId = await resolveBrandId();
+      const brandId = await resolveBrandId(req);
       const note = await competitorNotes.create({
         brand_id: brandId,
         competitor_name: competitorName,

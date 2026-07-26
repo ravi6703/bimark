@@ -1,10 +1,15 @@
 import { config } from "../config.js";
 import { logger } from "../logger.js";
-import type { PostMetrics, PublishRequest, PublishResult, Publisher } from "./types.js";
+import type { PostMetrics, PublishCredentials, PublishRequest, PublishResult, Publisher } from "./types.js";
 
 /**
  * Ayrshare adapter — API-first (§12.3). One key posts to all linked networks;
  * `platforms` selects which. Analytics come back from /analytics/post.
+ *
+ * Multi-brand support: each call can override the API key and/or pass a
+ * Profile-Key (Ayrshare's multi-profile plan) so a brand with its own
+ * connected accounts posts through those, not the shared default — see
+ * db/migrations/010_brand_publish_credentials.sql.
  */
 export class AyrsharePublisher implements Publisher {
   readonly name = "ayrshare";
@@ -14,10 +19,11 @@ export class AyrsharePublisher implements Publisher {
     if (!apiKey) throw new Error("AyrsharePublisher requires AYRSHARE_API_KEY");
   }
 
-  private headers() {
+  private headers(creds?: PublishCredentials) {
     return {
-      authorization: `Bearer ${this.apiKey}`,
+      authorization: `Bearer ${creds?.apiKeyOverride || this.apiKey}`,
       "content-type": "application/json",
+      ...(creds?.profileKey ? { "Profile-Key": creds.profileKey } : {}),
     };
   }
 
@@ -32,7 +38,7 @@ export class AyrsharePublisher implements Publisher {
 
     const res = await fetch(`${this.base}/post`, {
       method: "POST",
-      headers: this.headers(),
+      headers: this.headers(req),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`ayrshare publish failed: ${res.status} ${await res.text()}`);
@@ -49,11 +55,11 @@ export class AyrsharePublisher implements Publisher {
     };
   }
 
-  async fetchMetrics(externalId: string): Promise<PostMetrics | null> {
+  async fetchMetrics(externalId: string, creds?: PublishCredentials): Promise<PostMetrics | null> {
     try {
       const res = await fetch(`${this.base}/analytics/post`, {
         method: "POST",
-        headers: this.headers(),
+        headers: this.headers(creds),
         body: JSON.stringify({ id: externalId }),
       });
       if (!res.ok) return null;

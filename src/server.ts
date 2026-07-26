@@ -2,7 +2,7 @@ import express, { type Request, type Response } from "express";
 import { z } from "zod";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
-import { approvals } from "./db/repositories/index.js";
+import { approvals, brands } from "./db/repositories/index.js";
 import { handleManualIntake } from "./workflows/wf3_manualIntake.js";
 import { handleTelegramUpdate } from "./telegram/handleUpdate.js";
 
@@ -27,7 +27,12 @@ export function createServer() {
 
   app.get("/metrics/quality", async (_req, res) => {
     if (!config.db.enabled) return res.status(503).json({ error: "DB not configured" });
-    const stats = await approvals.qualityStats();
+    // This Docker/VM server predates multi-brand support and has no brand
+    // switcher of its own (see api/*.ts for the Vercel deployment, which
+    // does) — reports against whichever brand was seeded first.
+    const brand = await brands.first();
+    if (!brand) return res.status(404).json({ error: "no brand configured" });
+    const stats = await approvals.qualityStats(brand.id);
     res.json({ ...stats, target: config.quality.firstPassApprovalTarget });
   });
 

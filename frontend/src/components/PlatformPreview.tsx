@@ -21,6 +21,12 @@ function initials(name: string) {
   return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
+/** e.g. "Leadup Universe" -> "leadupuniverse" — a plausible handle when the
+ * brand's own social handle isn't stored anywhere (multi-brand support). */
+function handleize(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 /** LinkedIn truncates a feed post around this many characters before "…see more". */
 const LI_TRUNCATE = 210;
 /** Instagram truncates a caption to roughly this many characters before "more". */
@@ -61,7 +67,7 @@ export function PlatformPreview({
           <div className="pv-avatar pv-avatar-x">{initials(brandName)}</div>
           <div className="pv-names">
             <span className="pv-name">{brandName}</span>
-            <span className="pv-handle">@boardinfinity · 2h</span>
+            <span className="pv-handle">@{handleize(brandName)} · 2h</span>
           </div>
         </div>
         <p className="pv-body pv-x-body">{body}</p>
@@ -81,7 +87,7 @@ export function PlatformPreview({
         <div className="pv-head">
           <div className="pv-avatar pv-avatar-ig">{initials(brandName)}</div>
           <div className="pv-names">
-            <span className="pv-name">boardinfinity</span>
+            <span className="pv-name">{handleize(brandName)}</span>
           </div>
           <span className="pv-menu-dots">···</span>
         </div>
@@ -100,7 +106,7 @@ export function PlatformPreview({
         <ExpandableText
           className="pv-body pv-ig-caption"
           limit={IG_TRUNCATE}
-          text={`boardinfinity ${body}`}
+          text={`${handleize(brandName)} ${body}`}
         />
       </div>
     );

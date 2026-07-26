@@ -22,9 +22,22 @@ export type Platform = "linkedin" | "x" | "instagram" | "geo" | "youtube";
 export interface Brand {
   id: number;
   name: string;
+  /** URL-safe identifier (e.g. "leadup-universe") — how the dashboard/API pick
+   * which brand's workspace a request is for (multi-brand support). */
+  slug: string;
   voice_guide: string | null;
   visual_notes: string | null;
   banned_topics: string[] | null;
+  /** Per-brand competitor set for SOV/competitor-dashboard — each brand
+   * competes with different companies, so there's no one global list. */
+  default_competitors: string[] | null;
+  /** Per-brand publish credentials (multi-brand support follow-up) — NULL
+   * falls back to the shared/global publisher config (config.publish.*). See
+   * db/migrations/010_brand_publish_credentials.sql for the two ways this
+   * can be set up (separate Ayrshare account per brand, or one account's
+   * multi-profile plan with a per-brand Profile-Key). */
+  ayrshare_api_key: string | null;
+  ayrshare_profile_key: string | null;
   created_at: Date;
 }
 

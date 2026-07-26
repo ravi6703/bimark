@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, clearToken, getToken } from "./api";
+import { api, clearToken, getSelectedBrandSlug, getToken, setSelectedBrandSlug, type Brand } from "./api";
+import { BrandNameProvider } from "./brandContext";
 import { Login } from "./components/Login";
 import { DraftQueue } from "./components/DraftQueue";
 import { NewTopicForm } from "./components/NewTopicForm";
@@ -84,6 +85,37 @@ export function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
 
+  // Brand switcher (multi-brand support) — Board Infinity runs several
+  // distinct brand lines (Leadup Universe, InfyLearn, Elearning Solutions,
+  // alongside Board Infinity itself), each its own content workspace.
+  const [brandList, setBrandList] = useState<Brand[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authed) return;
+    api
+      .listBrands()
+      .then((rows) => {
+        setBrandList(rows);
+        const stored = getSelectedBrandSlug();
+        const valid = stored && rows.some((b) => b.slug === stored) ? stored : rows[0]?.slug ?? null;
+        if (valid) {
+          setSelectedBrandSlug(valid);
+          setSelectedBrand(valid);
+        }
+      })
+      .catch(() => {
+        // brand list is a nice-to-have UI affordance; a request-level 500
+        // will still surface wherever the failing call actually happens
+      });
+  }, [authed]);
+
+  function handleBrandChange(slug: string) {
+    setSelectedBrandSlug(slug);
+    setSelectedBrand(slug);
+    setNavOpen(false);
+  }
+
   async function refreshPendingCount() {
     try {
       const drafts = await api.listDrafts("pending_approval");
@@ -94,7 +126,7 @@ export function App() {
   }
 
   useEffect(() => {
-    if (!authed) return;
+    if (!authed || !selectedBrand) return;
     refreshPendingCount();
     // A shorter fallback interval plus an immediate refetch whenever this tab
     // regains focus — a shared queue's badge goes stale fast on a plain
@@ -110,13 +142,14 @@ export function App() {
       document.removeEventListener("visibilitychange", refreshPendingCount);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, [authed, selectedBrand]);
 
   if (!authed) {
     return <Login onLoggedIn={() => setAuthed(true)} />;
   }
 
   const active = TABS.find((t) => t.key === tab)!;
+  const currentBrandName = brandList.find((b) => b.slug === selectedBrand)?.name ?? "Board Infinity";
 
   function goTo(key: TabKey) {
     setTab(key);
@@ -124,6 +157,7 @@ export function App() {
   }
 
   return (
+    <BrandNameProvider value={currentBrandName}>
     <div className="app-shell">
       <button
         className="nav-toggle"
@@ -137,9 +171,33 @@ export function App() {
 
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="brand-mark">BI</div>
-          <div>
-            <div className="brand-name">Board Infinity</div>
+          <div className="brand-mark">
+            {(brandList.find((b) => b.slug === selectedBrand)?.name ?? "BI")
+              .split(/\s+/)
+              .map((w) => w[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {brandList.length > 1 ? (
+              <select
+                className="brand-switcher"
+                value={selectedBrand ?? ""}
+                onChange={(e) => handleBrandChange(e.target.value)}
+                aria-label="Switch brand workspace"
+              >
+                {brandList.map((b) => (
+                  <option key={b.slug} value={b.slug}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="brand-name">
+                {brandList.find((b) => b.slug === selectedBrand)?.name ?? "Board Infinity"}
+              </div>
+            )}
             <div className="brand-sub">Presence dashboard</div>
           </div>
         </div>
@@ -176,7 +234,7 @@ export function App() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className="main-content" key={selectedBrand ?? "no-brand"}>
         <header className="page-header">
           <h1>{active.title}</h1>
           <p>{active.subtitle}</p>
@@ -193,5 +251,6 @@ export function App() {
         {tab === "team" && <TeamView />}
       </main>
     </div>
+    </BrandNameProvider>
   );
 }

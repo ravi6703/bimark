@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const brandId = await resolveBrandId();
+    const brandId = await resolveBrandId(req);
     const pillarName = typeof req.query.pillar === "string" ? req.query.pillar : "";
     let pillarId: number | null = null;
     if (pillarName) {
