@@ -184,6 +184,14 @@ body {
 
 .page-header {
   margin-bottom: 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.new-topic-cta {
+  flex-shrink: 0;
 }
 .page-header h1 {
   font-size: 20px;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type Draft } from "../api";
 import { DraftCard } from "./DraftCard";
 import { EmptyState } from "./EmptyState";
+import { InfoCallout } from "./InfoCallout";
 
 const STATUSES = [
   { key: "pending_approval", label: "Needs review" },
@@ -26,13 +27,28 @@ const PLATFORMS = [
 ];
 
 // What each platform tab actually means — shown so "GEO" and "YouTube" aren't
-// unexplained jargon sitting next to the familiar social platforms.
-const PLATFORM_EXPLAINERS: Record<string, string> = {
-  linkedin: "💼 Long-form thought-leadership posts, published automatically once approved.",
-  instagram: "📸 Caption + an auto-generated image, published automatically once approved.",
-  x: "✖️ Short, single-idea posts, published automatically once approved.",
-  geo: '✨ GEO = Generative-Engine Optimization: a direct-answer article written to be found and cited by AI answer engines (ChatGPT, Perplexity) — not a social post. There\'s no publish API for that, so approving it just copies the text out for you to place on your own site/CMS, then "Mark as posted" logs it here.',
-  youtube: "🎬 A script/outline for a video, not a finished video — nothing is filmed or uploaded automatically. Approving locks the script in for you to shoot and upload yourself, then \"Mark as posted\" logs it here.",
+// unexplained jargon sitting next to the familiar social platforms. GEO and
+// YouTube get a collapsed "why" (same InfoCallout pattern as the intelligence
+// tabs) since their explanation genuinely needs more than one line; the three
+// familiar platforms don't, so they stay a single plain line.
+const PLATFORM_EXPLAINERS: Record<string, { icon: string; summary: string; detail?: string }> = {
+  linkedin: { icon: "💼", summary: "Long-form thought-leadership posts, published automatically once approved." },
+  instagram: { icon: "📸", summary: "Caption + an auto-generated image, published automatically once approved." },
+  x: { icon: "✖️", summary: "Short, single-idea posts, published automatically once approved." },
+  geo: {
+    icon: "✨",
+    summary: "A direct-answer article for AI answer engines (ChatGPT, Perplexity) — not a social post.",
+    detail:
+      'GEO = Generative-Engine Optimization. There\'s no publish API for that, so approving it just ' +
+      'copies the text out for you to place on your own site/CMS, then "Mark as posted" logs it here.',
+  },
+  youtube: {
+    icon: "🎬",
+    summary: "A script/outline for a video, not a finished video.",
+    detail:
+      'Nothing is filmed or uploaded automatically. Approving locks the script in for you to shoot ' +
+      'and upload yourself, then "Mark as posted" logs it here.',
+  },
 };
 
 export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void } = {}) {
@@ -111,11 +127,19 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
         })}
       </div>
 
-      {platform !== "all" && (
-        <div className="callout-box" style={{ marginBottom: 16 }}>
-          {PLATFORM_EXPLAINERS[platform]}
-        </div>
-      )}
+      {platform !== "all" &&
+        PLATFORM_EXPLAINERS[platform] &&
+        (PLATFORM_EXPLAINERS[platform].detail ? (
+          <InfoCallout
+            icon={PLATFORM_EXPLAINERS[platform].icon}
+            summary={PLATFORM_EXPLAINERS[platform].summary}
+            detail={PLATFORM_EXPLAINERS[platform].detail!}
+          />
+        ) : (
+          <div className="callout-box" style={{ marginBottom: 16 }}>
+            {PLATFORM_EXPLAINERS[platform].icon} {PLATFORM_EXPLAINERS[platform].summary}
+          </div>
+        ))}
 
       <div className="queue-toolbar">
         <div className="status-tabs" role="tablist" aria-label="Filter by status">
