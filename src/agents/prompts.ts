@@ -50,10 +50,20 @@ Return ONLY JSON: {"A":{"angle","pillar","asset_id","why_now"},
  * no image generation) — matches what's actually built (§20: image gen is a
  * later phase).
  */
-export type TargetPlatform = "linkedin" | "x" | "instagram" | "geo";
+export type TargetPlatform = "linkedin" | "x" | "instagram" | "geo" | "youtube";
 
 function platformSpec(platform: TargetPlatform): string {
   switch (platform) {
+    case "youtube":
+      return `PLATFORM: YouTube script/outline. There is no video-generation pipeline here —
+this is a SCRIPT for a human to shoot, not a finished video. Structure it as:
+TITLE: a specific, searchable title (not clickbait).
+HOOK: the first 10-15 seconds, spoken, that earns a viewer staying past the intro.
+TALKING POINTS: 3-5 numbered points, each one concrete idea grounded in the
+  source material, in the order they'd be spoken.
+CTA: one line, low-pressure (e.g. "more on this in our resources").
+Plain spoken language, not written prose — short sentences a person can say
+out loud. No hashtags.`;
     case "x":
       return `PLATFORM: X (Twitter). A single post, <=280 characters INCLUDING spaces
 and any hashtags. One sharp idea, not a summary of the LinkedIn version.
@@ -89,12 +99,19 @@ export function repurposePrompt(input: {
   mustSay?: string | null;
   format?: string | null;
   platform?: TargetPlatform;
+  /** Recent angles already covered for this pillar+platform (§20 follow-up,
+   * "show previous data") — steers the model away from repeating itself,
+   * on top of the after-the-fact distinctiveness guard. */
+  recentAngles?: string[];
 }): { system: string; user: string } {
   const system = `You are a senior B2B content writer for Board Infinity. Objective: BRAND
 CREDIBILITY, not lead-gen.`;
   const extras = [
     input.format ? `DESIRED FORMAT: ${input.format}` : "",
     input.mustSay ? `MUST-SAY POINTS: ${input.mustSay}` : "",
+    input.recentAngles?.length
+      ? `RECENTLY COVERED ON THIS PLATFORM/PILLAR (find a genuinely new angle, don't rehash these):\n- ${input.recentAngles.join("\n- ")}`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -134,7 +151,9 @@ Review the draft against this checklist and BLOCK anything that fails.`;
       ? "6. Is <=280 characters total (X's hard limit)."
       : input.platform === "geo"
         ? "6. Opens with a direct, complete answer to the target question in the first sentence; 150-400 words; every claim is independently checkable against the source — this will be quoted as fact."
-        : "6. Fits the platform's length norm (roughly 120-200 words for LinkedIn, a short caption for Instagram).";
+        : input.platform === "youtube"
+          ? "6. Has a TITLE, HOOK, numbered TALKING POINTS, and a CTA section; reads like something spoken aloud, not written prose; every talking point is grounded in the source material."
+          : "6. Fits the platform's length norm (roughly 120-200 words for LinkedIn, a short caption for Instagram).";
   const user = `DRAFT: ${input.draft}
 CLAIMS_USED: ${input.claimsUsed}   SOURCE MATERIAL: ${input.retrievedChunks}
 BANNED TOPICS: ${input.bannedTopics}   VOICE GUIDE: ${input.voiceGuide}

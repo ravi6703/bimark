@@ -69,6 +69,11 @@ export interface Draft {
   repetitive: boolean;
   similar_to_draft_id: number | null;
   geo_readiness?: { score: number; checks: { label: string; pass: boolean }[] };
+  /** Rationale fields (Okara-inspired follow-up) — why this draft exists at all. */
+  topic_why_now: string | null;
+  topic_source: string | null;
+  topic_format_hint: string | null;
+  topic_platform_extra: PlatformDetails[keyof PlatformDetails] | null;
 }
 export interface Topic {
   id: number;
@@ -137,6 +142,8 @@ export interface PlatformDetails {
   instagram?: { visualStyle?: "photography" | "illustration" | "infographic" };
   /** GEO (generative-engine optimization) — no publish API exists for this; see DraftCard. */
   geo?: { targetQuestion?: string };
+  /** YouTube — a script/outline, no video pipeline, no publish API; see DraftCard. */
+  youtube?: { videoAngle?: "tutorial" | "explainer" | "interview-clip" };
 }
 /** AI-derived onboarding proposal (Okara-inspired) — see OnboardingPanel. */
 export interface OnboardingProposal {
@@ -308,6 +315,18 @@ export const api = {
       body: JSON.stringify({ brand_id: 1, ...input }),
     });
     return results;
+  },
+
+  /** Recent angles already covered for this pillar+platform (Okara-inspired follow-up). */
+  async getRecentTopics(
+    platform: string,
+    pillar?: string,
+  ): Promise<{ angle: string; created_at: string; status: string }[]> {
+    const qs = new URLSearchParams({ platform, ...(pillar ? { pillar } : {}) }).toString();
+    const { recent } = await request<{ recent: { angle: string; created_at: string; status: string }[] }>(
+      `/topics/recent?${qs}`,
+    );
+    return recent;
   },
 
   async clarifyTopic(input: {

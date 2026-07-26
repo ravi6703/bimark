@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type Draft } from "../api";
 import { DraftCard } from "./DraftCard";
 
@@ -11,11 +11,36 @@ const STATUSES = [
   { key: "all", label: "All" },
 ];
 
+// Per-platform separation (Okara-inspired follow-up) — previously every
+// platform's drafts sat in one blended list; that made it hard to review
+// LinkedIn in one pass, Instagram in another, etc. This tab sits ABOVE the
+// status filter, so "LinkedIn, needs review" is its own clean view.
+const PLATFORMS = [
+  { key: "all", label: "All platforms", icon: "🗂️" },
+  { key: "linkedin", label: "LinkedIn", icon: "💼" },
+  { key: "instagram", label: "Instagram", icon: "📸" },
+  { key: "x", label: "X", icon: "✖️" },
+  { key: "geo", label: "GEO", icon: "✨" },
+  { key: "youtube", label: "YouTube", icon: "🎬" },
+];
+
 export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void } = {}) {
   const [status, setStatus] = useState("pending_approval");
+  const [platform, setPlatform] = useState("all");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of drafts) counts[d.platform] = (counts[d.platform] ?? 0) + 1;
+    return counts;
+  }, [drafts]);
+
+  const visibleDrafts = useMemo(
+    () => (platform === "all" ? drafts : drafts.filter((d) => d.platform === platform)),
+    [drafts, platform],
+  );
 
   async function load() {
     setLoading(true);
@@ -57,6 +82,24 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
 
   return (
     <div>
+      <div className="platform-tabs" role="tablist" aria-label="Filter by platform">
+        {PLATFORMS.map((p) => {
+          const count = p.key === "all" ? drafts.length : platformCounts[p.key] ?? 0;
+          return (
+            <button
+              key={p.key}
+              role="tab"
+              aria-selected={platform === p.key}
+              className={platform === p.key ? "active" : ""}
+              onClick={() => setPlatform(p.key)}
+            >
+              <span aria-hidden="true">{p.icon}</span> {p.label}
+              {count > 0 && <span className="platform-tab-count">{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="queue-toolbar">
         <div className="status-tabs" role="tablist" aria-label="Filter by status">
           {STATUSES.map((s) => (
@@ -73,17 +116,21 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
         </div>
         {!loading && !error && (
           <span className="queue-count">
-            {drafts.length} draft{drafts.length === 1 ? "" : "s"}
+            {visibleDrafts.length} draft{visibleDrafts.length === 1 ? "" : "s"}
           </span>
         )}
       </div>
 
       {error && <div className="error-box">{error}</div>}
       {loading && <div className="spinner-text">Loading…</div>}
-      {!loading && drafts.length === 0 && (
-        <div className="empty">No drafts here right now.</div>
+      {!loading && visibleDrafts.length === 0 && (
+        <div className="empty">
+          {drafts.length === 0
+            ? "No drafts here right now."
+            : "No drafts for this platform in this status — try another platform or status tab."}
+        </div>
       )}
-      {drafts.map((d) => (
+      {visibleDrafts.map((d) => (
         <DraftCard key={d.id} draft={d} onChanged={handleChanged} />
       ))}
     </div>

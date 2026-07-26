@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireAuth } from "../../_lib/requireAuth.js";
 import { logger } from "../../../src/logger.js";
-import { markGeoPosted } from "../../../src/workflows/wf5_approvalCallback.js";
+import { markManuallyPosted } from "../../../src/workflows/wf5_approvalCallback.js";
 
 /**
- * POST /api/drafts/:id/mark-posted — GEO's equivalent of the publish button
- * (Okara-inspired follow-up). There's no platform API to auto-post GEO
- * content to your own website/CMS, so the operator copies it out manually
- * and then marks it posted here — same recordkeeping (a `posts` row) as a
- * real publish, just without calling a publisher.
+ * POST /api/drafts/:id/mark-posted — GEO/YouTube's equivalent of the publish
+ * button (Okara-inspired follow-up). Neither has a platform API to auto-post
+ * to (no "post to ChatGPT," no video to auto-upload), so the operator places
+ * it manually and then marks it posted here — same recordkeeping (a `posts`
+ * row) as a real publish, just without calling a publisher.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const me = requireAuth(req, res);
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const post = await markGeoPosted(draftId, me.name);
+    const post = await markManuallyPosted(draftId, me.name);
     res.status(200).json({ ok: true, post });
   } catch (err) {
     logger.error({ err, draftId }, "mark-posted failed");

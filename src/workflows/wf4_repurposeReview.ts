@@ -18,6 +18,7 @@ import type {
   RetrievedChunk,
   Topic,
   XExtra,
+  YoutubeExtra,
 } from "../types.js";
 
 /**
@@ -49,6 +50,15 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
     .filter(Boolean)
     .join(" ") || undefined;
 
+  // Step 1c — recent angles already covered for this pillar+platform (§20
+  // follow-up, "show previous data") — steers generation away from repeating
+  // itself, proactively rather than only catching it after the fact (5a).
+  const recentAngles = (
+    await drafts.listRecentAngles(topic.brand_id, platform, topic.pillar_id, 5)
+  )
+    .map((r) => r.angle)
+    .filter((a) => a && a !== topic.angle);
+
   // Step 2 — repurpose into a draft.
   let draftOut = await repurpose({
     voiceGuide,
@@ -58,6 +68,7 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
     mustSay,
     format: topic.format_hint,
     platform,
+    recentAngles,
   });
 
   // Step 3 & 4 — brand-safety review loop; escalate if persistently flagged.
@@ -89,6 +100,7 @@ export async function runRepurposeReview(topicId: number): Promise<Draft> {
       mustSay,
       format: topic.format_hint,
       platform,
+      recentAngles,
     });
   }
 
@@ -220,7 +232,7 @@ async function resolvePillarName(topic: Topic): Promise<string> {
   return list.find((p) => p.id === topic.pillar_id)?.name ?? "";
 }
 
-const VALID_PLATFORMS = new Set<TargetPlatform>(["linkedin", "x", "instagram", "geo"]);
+const VALID_PLATFORMS = new Set<TargetPlatform>(["linkedin", "x", "instagram", "geo", "youtube"]);
 function normalizePlatform(p: string): TargetPlatform {
   return VALID_PLATFORMS.has(p as TargetPlatform) ? (p as TargetPlatform) : "linkedin";
 }
@@ -259,6 +271,19 @@ function extraGuidance(platform: TargetPlatform, extra: Topic["platform_extra"])
   if (platform === "geo") {
     const { targetQuestion } = extra as GeoExtra;
     return targetQuestion ? `Directly answer this question: ${targetQuestion}` : null;
+  }
+  if (platform === "youtube") {
+    const { videoAngle } = extra as YoutubeExtra;
+    switch (videoAngle) {
+      case "tutorial":
+        return "Structure it as a step-by-step tutorial — numbered, actionable steps.";
+      case "explainer":
+        return "Structure it as a concept explainer — build understanding, not a how-to.";
+      case "interview-clip":
+        return "Write it as talking points for a short interview-style clip, not a monologue.";
+      default:
+        return null;
+    }
   }
   return null; // instagram's platform_extra is visual-only, applied to the image prompt
 }

@@ -381,6 +381,33 @@ export const drafts = {
     );
     return rows[0] ?? null;
   },
+  /**
+   * Recent angles already covered for this pillar+platform (Okara-inspired
+   * follow-up, "show previous data") — fed into the generation prompt so a
+   * new draft doesn't blindly repeat what's already been said, and surfaced
+   * to the operator before they submit a new topic.
+   */
+  async listRecentAngles(
+    brandId: number,
+    platform: string,
+    pillarId: number | null,
+    limit = 5,
+  ): Promise<{ angle: string; created_at: Date; status: DraftStatus }[]> {
+    const pillarClause = pillarId != null ? "AND t.pillar_id = $3" : "AND t.pillar_id IS NULL";
+    const params = pillarId != null ? [brandId, platform, pillarId, limit] : [brandId, platform, limit];
+    const { rows } = await query<{ angle: string; created_at: Date; status: DraftStatus }>(
+      `SELECT t.angle, d.created_at, d.status
+         FROM drafts d
+         JOIN topics t ON t.id = d.topic_id
+        WHERE t.brand_id = $1 AND d.platform = $2 ${pillarClause}
+          AND d.status IN ('approved','edited','approved_hold','pending_approval')
+          AND t.angle IS NOT NULL
+        ORDER BY d.created_at DESC
+        LIMIT $${pillarId != null ? 4 : 3}`,
+      params,
+    );
+    return rows;
+  },
   /** For the dashboard's review queue — joins the topic's angle/pillar for context. */
   async listWithContext(
     brandId: number,
@@ -390,7 +417,9 @@ export const drafts = {
     const statusClause = opts.status ? "AND d.status = $2" : "";
     const params: unknown[] = opts.status ? [brandId, opts.status, limit] : [brandId, limit];
     const { rows } = await query<DraftWithContext>(
-      `SELECT d.*, t.angle AS topic_angle, t.brand_id AS brand_id, pl.name AS pillar_name
+      `SELECT d.*, t.angle AS topic_angle, t.brand_id AS brand_id, pl.name AS pillar_name,
+              t.why_now AS topic_why_now, t.source AS topic_source,
+              t.format_hint AS topic_format_hint, t.platform_extra AS topic_platform_extra
          FROM drafts d
          JOIN topics t ON t.id = d.topic_id
          LEFT JOIN pillars pl ON pl.id = t.pillar_id

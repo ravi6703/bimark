@@ -278,6 +278,31 @@ body {
   margin-top: 0;
 }
 
+.recent-angles-box {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+.recent-angles-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.recent-angles-box ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.recent-angles-box li {
+  font-size: 12.5px;
+  color: var(--text);
+  padding: 2px 0;
+}
+
 .draft-image {
   display: block;
   width: 100%;
@@ -445,6 +470,56 @@ body {
   line-height: 1.6;
 }
 
+/* YouTube: a script, not a video — thumbnail placeholder + spoken-word script. */
+.pv-youtube {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+}
+.pv-yt-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ff6b6b;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.pv-yt-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #1a1a1a;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.pv-yt-play {
+  font-size: 32px;
+  color: #ff6b6b;
+  opacity: 0.85;
+}
+.pv-yt-thumb-title {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  right: 8px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.pv-yt-script {
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: inherit;
+  white-space: pre-wrap;
+}
+
 .card-head {
   display: flex;
   align-items: center;
@@ -478,6 +553,10 @@ body {
 .badge.geo {
   color: #a5e8d0;
   border-color: #2f6b58;
+}
+.badge.youtube {
+  color: #ff8a8a;
+  border-color: #6b2f2f;
 }
 .badge.warn {
   color: var(--amber);
@@ -701,6 +780,35 @@ input[type="radio"] {
   color: var(--amber);
 }
 
+.rationale-box {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.rationale-box summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.rationale-box ul {
+  margin: 8px 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+.rationale-box li {
+  padding: 3px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.rationale-box li b {
+  color: var(--text);
+}
+
 .callout-box {
   background: var(--panel-2);
   border: 1px solid var(--accent);
@@ -846,6 +954,48 @@ input[type="radio"] {
   background: var(--accent);
   color: #0b1220;
   border-color: var(--accent);
+}
+
+/* Platform tabs sit above the status tabs (Okara-inspired follow-up) — a
+ * visually heavier row so it reads as the primary split, status as the
+ * secondary filter within it. */
+.platform-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.platform-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.platform-tabs button.active {
+  background: var(--panel-2);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.platform-tab-count {
+  background: var(--border);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.platform-tabs button.active .platform-tab-count {
+  background: var(--accent);
+  color: #0b1220;
 }
 
 .spinner-text {
