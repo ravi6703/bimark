@@ -25,6 +25,16 @@ const PLATFORMS = [
   { key: "youtube", label: "YouTube", icon: "🎬" },
 ];
 
+// What each platform tab actually means — shown so "GEO" and "YouTube" aren't
+// unexplained jargon sitting next to the familiar social platforms.
+const PLATFORM_EXPLAINERS: Record<string, string> = {
+  linkedin: "💼 Long-form thought-leadership posts, published automatically once approved.",
+  instagram: "📸 Caption + an auto-generated image, published automatically once approved.",
+  x: "✖️ Short, single-idea posts, published automatically once approved.",
+  geo: '✨ GEO = Generative-Engine Optimization: a direct-answer article written to be found and cited by AI answer engines (ChatGPT, Perplexity) — not a social post. There\'s no publish API for that, so approving it just copies the text out for you to place on your own site/CMS, then "Mark as posted" logs it here.',
+  youtube: "🎬 A script/outline for a video, not a finished video — nothing is filmed or uploaded automatically. Approving locks the script in for you to shoot and upload yourself, then \"Mark as posted\" logs it here.",
+};
+
 export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void } = {}) {
   const [status, setStatus] = useState("pending_approval");
   const [platform, setPlatform] = useState("all");
@@ -100,6 +110,12 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
           );
         })}
       </div>
+
+      {platform !== "all" && (
+        <div className="callout-box" style={{ marginBottom: 16 }}>
+          {PLATFORM_EXPLAINERS[platform]}
+        </div>
+      )}
 
       <div className="queue-toolbar">
         <div className="status-tabs" role="tablist" aria-label="Filter by status">

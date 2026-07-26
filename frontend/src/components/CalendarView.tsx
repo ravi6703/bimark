@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type PostItem } from "../api";
+import { EmptyState } from "./EmptyState";
 
 const DAY_MS = 24 * 3600 * 1000;
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -78,7 +79,20 @@ export function CalendarView() {
       {error && <div className="error-box">{error}</div>}
       {loading && <div className="spinner-text">Loading…</div>}
 
-      {!loading && !error && (
+      {!loading && !error && posts.length === 0 && (
+        <EmptyState
+          icon="📅"
+          title="Nothing scheduled or published this month"
+          description={
+            'This fills in from real posts — nothing invented here. Approve a draft in the Review ' +
+            'queue and choose "Schedule" (pick a date/time) or "Publish now" and it\'ll show up on ' +
+            "its day here. GEO and YouTube drafts don't auto-publish, so they only appear once you " +
+            'mark them posted.'
+          }
+        />
+      )}
+
+      {!loading && !error && posts.length > 0 && (
         <div className="cal-grid" role="table" aria-label={`Post calendar for ${monthLabel(month)}`}>
           <div className="cal-weekdays" role="row">
             {WEEKDAY_LABELS.map((w) => (

@@ -411,12 +411,17 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
                 </label>
               </fieldset>
               {mode === "schedule" && (
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  style={{ marginTop: 8 }}
-                />
+                <>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    style={{ marginTop: 8 }}
+                  />
+                  <div className="pillar-tag" style={{ marginTop: 4 }}>
+                    Shows up on the Calendar tab for that day once scheduled.
+                  </div>
+                </>
               )}
             </>
           )}
