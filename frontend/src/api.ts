@@ -118,6 +118,11 @@ export interface Brand {
   visual_notes: string | null;
   banned_topics: string[] | null;
   default_competitors: string[] | null;
+  /** Whether this brand has its own publish credentials configured — the
+   * secret values themselves never round-trip to the browser (multi-brand
+   * support follow-up); PATCH /api/brand is write-only for them. */
+  has_ayrshare_api_key: boolean;
+  has_ayrshare_profile_key: boolean;
 }
 export interface QualityStats {
   firstPassApprovalRate: number | null;
@@ -274,6 +279,8 @@ export const api = {
     voice_guide?: string;
     visual_notes?: string;
     banned_topics?: string[];
+    ayrshare_api_key?: string;
+    ayrshare_profile_key?: string;
   }): Promise<Brand> {
     const { brand } = await request<{ brand: Brand }>("/brand", {
       method: "PATCH",

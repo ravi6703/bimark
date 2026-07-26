@@ -1,5 +1,6 @@
 import type { VercelRequest } from "@vercel/node";
 import { brands } from "../../src/db/repositories/index.js";
+import type { Brand } from "../../src/types.js";
 
 /**
  * Resolves which brand a request is for (multi-brand support). The dashboard
@@ -17,4 +18,19 @@ export async function resolveBrandId(req?: VercelRequest): Promise<number> {
   const brand = await brands.first();
   if (!brand) throw new Error("no brand configured — run the seed script");
   return brand.id;
+}
+
+/**
+ * Never round-trip the raw publish credentials to the browser (multi-brand
+ * support follow-up) — the dashboard only needs to know WHETHER a brand has
+ * its own connected, not the secret value itself. PATCH /api/brand is
+ * write-only for these two fields.
+ */
+export function redactBrandCredentials(brand: Brand) {
+  const { ayrshare_api_key, ayrshare_profile_key, ...rest } = brand;
+  return {
+    ...rest,
+    has_ayrshare_api_key: !!ayrshare_api_key,
+    has_ayrshare_profile_key: !!ayrshare_profile_key,
+  };
 }

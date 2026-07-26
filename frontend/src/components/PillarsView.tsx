@@ -6,6 +6,8 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
   const [voiceGuide, setVoiceGuide] = useState(brand.voice_guide ?? "");
   const [visualNotes, setVisualNotes] = useState(brand.visual_notes ?? "");
   const [bannedTopics, setBannedTopics] = useState((brand.banned_topics ?? []).join(", "));
+  const [ayrshareApiKey, setAyrshareApiKey] = useState("");
+  const [ayrshareProfileKey, setAyrshareProfileKey] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +24,14 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
+        // Only send these if the operator actually typed something — an
+        // empty field must never overwrite an already-configured credential.
+        ayrshare_api_key: ayrshareApiKey.trim() || undefined,
+        ayrshare_profile_key: ayrshareProfileKey.trim() || undefined,
       });
       onSaved(updated);
+      setAyrshareApiKey("");
+      setAyrshareProfileKey("");
       setEditing(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Save failed");
@@ -51,6 +59,36 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
           <textarea id="visual" rows={3} value={visualNotes} onChange={(e) => setVisualNotes(e.target.value)} />
           <label htmlFor="banned">Banned topics (comma-separated)</label>
           <input id="banned" type="text" value={bannedTopics} onChange={(e) => setBannedTopics(e.target.value)} />
+
+          <div className="pillar-tag" style={{ marginTop: 14, marginBottom: 4, fontWeight: 700 }}>
+            Publish accounts (Ayrshare)
+          </div>
+          <p className="pillar-tag" style={{ marginBottom: 8 }}>
+            Leave blank to keep posting through the shared account. Set these once this brand has its
+            own connected LinkedIn/X/Instagram accounts — either its own Ayrshare API key, or (if you're
+            on Ayrshare's multi-profile plan) that brand's Profile Key.
+          </p>
+          <label htmlFor="ayr-key">
+            Ayrshare API key {brand.has_ayrshare_api_key ? "(configured — leave blank to keep it)" : ""}
+          </label>
+          <input
+            id="ayr-key"
+            type="password"
+            value={ayrshareApiKey}
+            onChange={(e) => setAyrshareApiKey(e.target.value)}
+            placeholder={brand.has_ayrshare_api_key ? "••••••••" : "not set"}
+          />
+          <label htmlFor="ayr-profile">
+            Ayrshare Profile Key {brand.has_ayrshare_profile_key ? "(configured — leave blank to keep it)" : ""}
+          </label>
+          <input
+            id="ayr-profile"
+            type="password"
+            value={ayrshareProfileKey}
+            onChange={(e) => setAyrshareProfileKey(e.target.value)}
+            placeholder={brand.has_ayrshare_profile_key ? "••••••••" : "not set"}
+          />
+
           {error && <div className="error-box" style={{ marginTop: 12 }}>{error}</div>}
           <div className="row">
             <button className="btn primary" type="submit" disabled={saving}>
@@ -66,6 +104,12 @@ function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => 
           {brand.banned_topics && brand.banned_topics.length > 0 && (
             <div className="pillar-tag">Banned topics: {brand.banned_topics.join(", ")}</div>
           )}
+          <div className="pillar-tag">
+            Publish accounts:{" "}
+            {brand.has_ayrshare_api_key || brand.has_ayrshare_profile_key
+              ? "own connected accounts configured ✓"
+              : "posting through the shared account (no brand-specific accounts connected yet)"}
+          </div>
           {brand.voice_guide && (
             <div className="body-text" style={{ fontSize: 13, color: "var(--text-dim)" }}>
               {brand.voice_guide}

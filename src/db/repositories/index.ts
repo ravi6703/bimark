@@ -72,15 +72,30 @@ export const brands = {
   },
   async update(
     id: number,
-    b: { voice_guide?: string; visual_notes?: string; banned_topics?: string[] },
+    b: {
+      voice_guide?: string;
+      visual_notes?: string;
+      banned_topics?: string[];
+      ayrshare_api_key?: string;
+      ayrshare_profile_key?: string;
+    },
   ): Promise<Brand | null> {
     const { rows } = await query<Brand>(
       `UPDATE brands SET
          voice_guide = COALESCE($2, voice_guide),
          visual_notes = COALESCE($3, visual_notes),
-         banned_topics = COALESCE($4, banned_topics)
+         banned_topics = COALESCE($4, banned_topics),
+         ayrshare_api_key = COALESCE($5, ayrshare_api_key),
+         ayrshare_profile_key = COALESCE($6, ayrshare_profile_key)
        WHERE id = $1 RETURNING *`,
-      [id, b.voice_guide ?? null, b.visual_notes ?? null, b.banned_topics ?? null],
+      [
+        id,
+        b.voice_guide ?? null,
+        b.visual_notes ?? null,
+        b.banned_topics ?? null,
+        b.ayrshare_api_key ?? null,
+        b.ayrshare_profile_key ?? null,
+      ],
     );
     return rows[0] ?? null;
   },
@@ -563,9 +578,16 @@ export const posts = {
     );
     return rows[0]!;
   },
-  async withinPollingWindow(now: Date): Promise<Post[]> {
-    const { rows } = await query<Post>(
-      "SELECT * FROM posts WHERE poll_until IS NOT NULL AND poll_until > $1",
+  /** Includes the owning brand's id (multi-brand support follow-up) — the
+   * poller needs it to fetch metrics through that brand's own publish
+   * credentials rather than always the shared default. */
+  async withinPollingWindow(now: Date): Promise<(Post & { brand_id: number })[]> {
+    const { rows } = await query<Post & { brand_id: number }>(
+      `SELECT po.*, t.brand_id
+         FROM posts po
+         JOIN drafts d ON d.id = po.draft_id
+         JOIN topics t ON t.id = d.topic_id
+        WHERE po.poll_until IS NOT NULL AND po.poll_until > $1`,
       [now],
     );
     return rows;

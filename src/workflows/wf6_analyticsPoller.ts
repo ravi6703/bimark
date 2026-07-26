@@ -1,6 +1,7 @@
 import { logger } from "../logger.js";
-import { metrics, posts } from "../db/repositories/index.js";
+import { brands, metrics, posts } from "../db/repositories/index.js";
 import { getPublisher } from "../publish/index.js";
+import type { PublishCredentials } from "../publish/types.js";
 
 /**
  * WF-6 · Analytics Poller (§16, scheduled, velocity window §7.1). Every ~30 min,
@@ -12,11 +13,25 @@ export async function runAnalyticsPoller(now = new Date()): Promise<{ polled: nu
   const publisher = getPublisher();
   let polled = 0;
 
+  // Per-brand publish credentials (multi-brand support follow-up) — cache
+  // per run so N posts from the same brand don't re-fetch its row N times.
+  const credsByBrand = new Map<number, PublishCredentials>();
+  async function credsFor(brandId: number): Promise<PublishCredentials> {
+    if (credsByBrand.has(brandId)) return credsByBrand.get(brandId)!;
+    const brand = await brands.get(brandId);
+    const creds: PublishCredentials = {
+      apiKeyOverride: brand?.ayrshare_api_key ?? undefined,
+      profileKey: brand?.ayrshare_profile_key ?? undefined,
+    };
+    credsByBrand.set(brandId, creds);
+    return creds;
+  }
+
   for (const post of active) {
     if (!post.external_id) continue;
     if (!shouldPoll(post.published_at ?? post.scheduled_at ?? now, now)) continue;
 
-    const m = await publisher.fetchMetrics(post.external_id);
+    const m = await publisher.fetchMetrics(post.external_id, await credsFor(post.brand_id));
     if (!m) continue;
 
     await metrics.insert({ post_id: post.id, ...m });
