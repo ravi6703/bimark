@@ -819,6 +819,26 @@ input[type="radio"] {
   margin-bottom: 16px;
 }
 
+.competitor-note {
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+}
+.competitor-note:first-of-type {
+  border-top: none;
+  padding-top: 4px;
+}
+.competitor-note-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.competitor-learning {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
 .publish-mode-row {
   display: flex;
   gap: 16px;

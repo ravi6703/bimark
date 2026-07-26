@@ -2,6 +2,7 @@ import type {
   ApprovalEntry,
   Brand,
   ChannelConfig,
+  CompetitorNote,
   Draft,
   DraftStatus,
   DraftWithContext,
@@ -608,6 +609,58 @@ export const sov = {
        VALUES ($1,$2,$3,$4,$5)`,
       [s.brand_id, s.pillar_id, s.bi_score, JSON.stringify(s.competitor_scores), s.sov_pct],
     );
+  },
+  /**
+   * Most recent snapshot's per-competitor scores (competitor dashboard,
+   * Okara-inspired follow-up) — real numbers from whichever SOV source is
+   * configured, aggregated across pillars, not invented. Returns null when
+   * there's no snapshot yet (isSovConfigured() upstream already covers "not
+   * configured at all").
+   */
+  async latestCompetitorScores(
+    brandId: number,
+  ): Promise<{ capturedAt: Date; scores: Record<string, number> } | null> {
+    const { rows } = await query<{ captured_at: Date; competitor_scores: Record<string, number> }>(
+      `SELECT captured_at, competitor_scores FROM sov_snapshots
+        WHERE brand_id = $1 ORDER BY captured_at DESC LIMIT 1`,
+      [brandId],
+    );
+    const latest = rows[0];
+    if (!latest) return null;
+    return { capturedAt: latest.captured_at, scores: latest.competitor_scores };
+  },
+};
+
+// ── Competitor intelligence log (Okara-inspired follow-up) ─────────────────
+export const competitorNotes = {
+  async list(brandId: number, limit = 200): Promise<CompetitorNote[]> {
+    const { rows } = await query<CompetitorNote>(
+      `SELECT * FROM competitor_notes WHERE brand_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [brandId, limit],
+    );
+    return rows;
+  },
+  async create(n: {
+    brand_id: number;
+    competitor_name: string;
+    source_url?: string | null;
+    summary: string;
+    learning?: string | null;
+    added_by: string;
+  }): Promise<CompetitorNote> {
+    const { rows } = await query<CompetitorNote>(
+      `INSERT INTO competitor_notes (brand_id, competitor_name, source_url, summary, learning, added_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [n.brand_id, n.competitor_name, n.source_url ?? null, n.summary, n.learning ?? null, n.added_by],
+    );
+    return rows[0]!;
+  },
+  async delete(id: number, brandId: number): Promise<boolean> {
+    const { rowCount } = await query(
+      "DELETE FROM competitor_notes WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return (rowCount ?? 0) > 0;
   },
 };
 
