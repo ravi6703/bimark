@@ -13,6 +13,7 @@
     { "path": "/api/cron/morning-pitch", "schedule": "30 2 * * *" },
     { "path": "/api/cron/analytics-poll", "schedule": "*/30 * * * *" },
     { "path": "/api/cron/sov", "schedule": "30 3 * * 1" },
-    { "path": "/api/cron/editorial-memo", "schedule": "30 3 1 * *" }
+    { "path": "/api/cron/editorial-memo", "schedule": "30 3 1 * *" },
+    { "path": "/api/cron/competitor-monitor", "schedule": "0 4 * * 1" }
   ]
 }
