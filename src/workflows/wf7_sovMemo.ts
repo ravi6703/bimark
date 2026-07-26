@@ -9,8 +9,15 @@ import { getTelegram } from "../telegram/client.js";
 // lives in src/sov/ (audit Phase 3), alongside its real Brand24 adapter.
 export { isSovConfigured, setSovSource, NullSovSource, type SovSource } from "../sov/index.js";
 
-/** Competitor set (§19) — the Digital Course Production peer set. */
-export const DEFAULT_COMPETITORS = ["Hurix", "MRCC", "Tesseract", "CommLab", "LetsTute"];
+/**
+ * Competitor set (§19). Corrected against Board Infinity's actual named
+ * competitors in campus-recruitment automation + hiring assessment
+ * (Superset, Mettl, Unstop, HackerEarth, HirePro, eLitmus) — the original
+ * placeholder set (Hurix/MRCC/Tesseract/CommLab/LetsTute) were generic
+ * e-learning content vendors, not real competitors in this business. Still
+ * just a starting list — confirm/edit with the team (README §12).
+ */
+export const DEFAULT_COMPETITORS = ["Superset", "Mettl", "Unstop", "HackerEarth", "HirePro", "eLitmus"];
 
 /**
  * WF-7a · SOV snapshot (§16 weekly / §19). For each pillar, score BI vs each

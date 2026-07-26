@@ -676,6 +676,31 @@ input[type="radio"] {
   white-space: nowrap;
 }
 
+.geo-readiness-box {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.geo-readiness-box summary {
+  cursor: pointer;
+  color: var(--text);
+}
+.geo-readiness-box ul {
+  margin: 8px 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+.geo-readiness-box li {
+  padding: 3px 0;
+  font-size: 12.5px;
+}
+.geo-readiness-box li.pass {
+  color: var(--green);
+}
+.geo-readiness-box li.fail {
+  color: var(--amber);
+}
+
 .callout-box {
   background: var(--panel-2);
   border: 1px solid var(--accent);

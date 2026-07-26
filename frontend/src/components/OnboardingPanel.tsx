@@ -9,6 +9,8 @@ import { api, ApiError, type OnboardingProposal } from "../api";
 export function OnboardingPanel({ onApplied }: { onApplied: () => void }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
+  const [showPaste, setShowPaste] = useState(false);
+  const [pastedText, setPastedText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,9 +22,13 @@ export function OnboardingPanel({ onApplied }: { onApplied: () => void }) {
     setSuccess(null);
     setAnalyzing(true);
     try {
-      setProposal(await api.proposeOnboarding(url.trim()));
+      setProposal(await api.proposeOnboarding(url.trim(), pastedText.trim() || undefined));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to analyze that URL");
+      const message = err instanceof ApiError ? err.message : "Failed to analyze that URL";
+      setError(message);
+      // Many sites block scraper bots (confirmed against boardinfinity.com
+      // itself) — nudge toward the paste fallback instead of a dead end.
+      if (!pastedText && /block|fetch|403|forbidden/i.test(message)) setShowPaste(true);
     } finally {
       setAnalyzing(false);
     }
@@ -87,6 +93,25 @@ export function OnboardingPanel({ onApplied }: { onApplied: () => void }) {
               {analyzing ? "Analyzing…" : "Analyze"}
             </button>
           </div>
+
+          <button
+            type="button"
+            className="onboarding-toggle"
+            style={{ fontSize: 12, marginTop: 8 }}
+            onClick={() => setShowPaste((v) => !v)}
+          >
+            <span>{showPaste ? "▾" : "▸"}</span>{" "}
+            {showPaste ? "Hide paste option" : "Site blocking automated fetches? Paste its text instead"}
+          </button>
+          {showPaste && (
+            <textarea
+              rows={6}
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder="Paste the homepage's visible text here — copy/paste from the browser works fine."
+              style={{ marginTop: 8 }}
+            />
+          )}
 
           {error && <div className="error-box" style={{ marginTop: 12 }}>{error}</div>}
           {success && <div className="success-box" style={{ marginTop: 12 }}>{success}</div>}

@@ -3,6 +3,7 @@ import { requireAuth } from "../_lib/requireAuth.js";
 import { resolveBrandId } from "../_lib/brand.js";
 import { logger } from "../../src/logger.js";
 import { drafts } from "../../src/db/repositories/index.js";
+import { computeGeoReadiness } from "../../src/geo/readiness.js";
 import type { DraftStatus } from "../../src/types.js";
 
 const VALID_STATUSES = new Set<DraftStatus>([
@@ -30,7 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           : "pending_approval";
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const rows = await drafts.listWithContext(brandId, { status, limit });
-    res.status(200).json({ ok: true, drafts: rows });
+    // GEO readiness (Okara-inspired follow-up) — cheap pure logic, computed
+    // at request time rather than stored, since it's just a derived view of
+    // the draft's own body/claims_used.
+    const withGeoReadiness = rows.map((d) =>
+      d.platform === "geo" ? { ...d, geo_readiness: computeGeoReadiness(d.body ?? "", d.claims_used) } : d,
+    );
+    res.status(200).json({ ok: true, drafts: withGeoReadiness });
   } catch (err) {
     logger.error({ err }, "drafts list failed");
     res.status(500).json({ error: "internal error" });

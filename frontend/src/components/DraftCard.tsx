@@ -158,6 +158,25 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
         />
       )}
 
+      {isGeo && draft.geo_readiness && (
+        <details className="geo-readiness-box">
+          <summary>
+            GEO readiness: <b>{draft.geo_readiness.score}%</b>
+          </summary>
+          <ul>
+            {draft.geo_readiness.checks.map((c, i) => (
+              <li key={i} className={c.pass ? "pass" : "fail"}>
+                {c.pass ? "✓" : "✗"} {c.label}
+              </li>
+            ))}
+          </ul>
+          <p className="pillar-tag" style={{ marginTop: 4 }}>
+            A rule-based self-check on this piece, not a real cross-engine citation measurement —
+            that would need a paid API actually querying ChatGPT/Perplexity/etc.
+          </p>
+        </details>
+      )}
+
       {draft.low_source && (
         <div className="meta-note">
           ⚠️ Low source — no strong owned material matched, this draft is lighter on proof.
