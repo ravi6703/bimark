@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type Topic } from "../api";
+import { EmptyState } from "./EmptyState";
 
 const STATUSES = [
   { key: "suggested", label: "Suggested" },
@@ -58,7 +59,13 @@ export function TopicsView() {
 
       {error && <div className="error-box">{error}</div>}
       {loading && <div className="spinner-text">Loading…</div>}
-      {!loading && topics.length === 0 && <div className="empty">No topics here right now.</div>}
+      {!loading && topics.length === 0 && (
+        <EmptyState
+          icon="💡"
+          title="No topics here right now"
+          description="Topics come from the AI's daily pitch or from someone on the team adding one manually — check back after the next pitch, or add one yourself from New topic."
+        />
+      )}
       {topics.map((t) => (
         <div className="card" key={t.id}>
           <div className="card-head">

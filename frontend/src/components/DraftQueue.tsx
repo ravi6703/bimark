@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type Draft } from "../api";
 import { DraftCard } from "./DraftCard";
+import { EmptyState } from "./EmptyState";
 
 const STATUSES = [
   { key: "pending_approval", label: "Needs review" },
@@ -124,11 +125,15 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
       {error && <div className="error-box">{error}</div>}
       {loading && <div className="spinner-text">Loading…</div>}
       {!loading && visibleDrafts.length === 0 && (
-        <div className="empty">
-          {drafts.length === 0
-            ? "No drafts here right now."
-            : "No drafts for this platform in this status — try another platform or status tab."}
-        </div>
+        <EmptyState
+          icon={drafts.length === 0 ? "📥" : "🔍"}
+          title={drafts.length === 0 ? "Nothing here right now" : "No matches for this filter"}
+          description={
+            drafts.length === 0
+              ? "Drafts show up here once a topic gets generated — try New topic to create one, or check back after the next scheduled pitch."
+              : "No drafts for this platform in this status — try another platform or status tab above."
+          }
+        />
       )}
       {visibleDrafts.map((d) => (
         <DraftCard key={d.id} draft={d} onChanged={handleChanged} />
