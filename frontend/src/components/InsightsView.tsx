@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type Insight } from "../api";
+import { EmptyState } from "./EmptyState";
 
 /**
  * The monthly editorial memo (WF-7b) — previously reached only via Telegram
@@ -35,7 +36,11 @@ export function InsightsView() {
         </div>
       )}
       {insights.length === 0 && (
-        <div className="empty">No editorial memos yet — the first one generates at month end.</div>
+        <EmptyState
+          icon="🗒️"
+          title="No editorial memos yet"
+          description="The first one generates automatically at month end, summarizing what landed, what didn't, and why — based on real approval/publish activity for this brand."
+        />
       )}
       {insights.map((i) => (
         <div className="card" key={i.id}>

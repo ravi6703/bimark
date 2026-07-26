@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type CompetitorGroup } from "../api";
+import { EmptyState } from "./EmptyState";
 
 export function CompetitorsView() {
   const [groups, setGroups] = useState<CompetitorGroup[]>([]);
@@ -224,7 +225,11 @@ export function CompetitorsView() {
           </div>
         ))}
       {!loading && groups.length === 0 && !error && (
-        <div className="empty">No tracked competitors yet.</div>
+        <EmptyState
+          icon="🕵️"
+          title="No tracked competitors yet"
+          description="Set a default competitor list for this brand in Pillars & brand, or just log a note above about any competitor — they'll show up here."
+        />
       )}
     </div>
   );
