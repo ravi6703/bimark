@@ -33,21 +33,40 @@ export const brands = {
     const { rows } = await query<Brand>("SELECT * FROM brands WHERE name = $1", [name]);
     return rows[0] ?? null;
   },
-  /** The MVP runs single-brand; this resolves that default brand. */
+  async getBySlug(slug: string): Promise<Brand | null> {
+    const { rows } = await query<Brand>("SELECT * FROM brands WHERE slug = $1", [slug]);
+    return rows[0] ?? null;
+  },
+  /** Back-compat default when no brand is specified in the request (multi-brand support). */
   async first(): Promise<Brand | null> {
     const { rows } = await query<Brand>("SELECT * FROM brands ORDER BY id LIMIT 1");
     return rows[0] ?? null;
   },
+  /** Every brand workspace — for the dashboard's brand switcher and the cron jobs
+   * that now run per-brand instead of assuming there's only one (multi-brand support). */
+  async listAll(): Promise<Brand[]> {
+    const { rows } = await query<Brand>("SELECT * FROM brands ORDER BY id");
+    return rows;
+  },
   async create(b: {
     name: string;
+    slug: string;
     voice_guide?: string;
     visual_notes?: string;
     banned_topics?: string[];
+    default_competitors?: string[];
   }): Promise<Brand> {
     const { rows } = await query<Brand>(
-      `INSERT INTO brands (name, voice_guide, visual_notes, banned_topics)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-      [b.name, b.voice_guide ?? null, b.visual_notes ?? null, b.banned_topics ?? null],
+      `INSERT INTO brands (name, slug, voice_guide, visual_notes, banned_topics, default_competitors)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [
+        b.name,
+        b.slug,
+        b.voice_guide ?? null,
+        b.visual_notes ?? null,
+        b.banned_topics ?? null,
+        b.default_competitors ?? null,
+      ],
     );
     return rows[0]!;
   },
@@ -474,7 +493,7 @@ export const approvals = {
     );
   },
   /** First-pass approval rate + mean edit distance (§7 operational metric). */
-  async qualityStats(): Promise<{
+  async qualityStats(brandId: number): Promise<{
     firstPassApprovalRate: number | null;
     meanEditDistance: number | null;
     sample: number;
@@ -486,11 +505,15 @@ export const approvals = {
       mean_edit: string | null;
     }>(
       `SELECT
-         count(*) FILTER (WHERE action = 'approve') AS approvals,
-         count(*) FILTER (WHERE action = 'edit')    AS edits,
-         count(*) FILTER (WHERE action = 'reject')  AS rejects,
-         avg(edit_distance) FILTER (WHERE action IN ('approve','edit')) AS mean_edit
-       FROM approvals`,
+         count(*) FILTER (WHERE a.action = 'approve') AS approvals,
+         count(*) FILTER (WHERE a.action = 'edit')    AS edits,
+         count(*) FILTER (WHERE a.action = 'reject')  AS rejects,
+         avg(a.edit_distance) FILTER (WHERE a.action IN ('approve','edit')) AS mean_edit
+       FROM approvals a
+       JOIN drafts d ON d.id = a.draft_id
+       JOIN topics t ON t.id = d.topic_id
+      WHERE t.brand_id = $1`,
+      [brandId],
     );
     const r = rows[0]!;
     const approvalsN = Number(r.approvals);
@@ -548,10 +571,14 @@ export const posts = {
     return rows;
   },
   /** Cadence rollup (audit Phase 1) — how many posts actually went out since `since`. */
-  async countPublishedSince(since: Date): Promise<number> {
+  async countPublishedSince(brandId: number, since: Date): Promise<number> {
     const { rows } = await query<{ n: string }>(
-      "SELECT count(*)::int AS n FROM posts WHERE published_at >= $1",
-      [since],
+      `SELECT count(*)::int AS n
+         FROM posts po
+         JOIN drafts d ON d.id = po.draft_id
+         JOIN topics t ON t.id = d.topic_id
+        WHERE t.brand_id = $1 AND po.published_at >= $2`,
+      [brandId, since],
     );
     return Number(rows[0]?.n ?? 0);
   },

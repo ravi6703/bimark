@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError, type ApprovalEntry, type Draft } from "../api";
 import { PlatformPreview } from "./PlatformPreview";
+import { useBrandName } from "../brandContext";
 
 /** Platform badge + human label. */
 function PlatformBadge({ platform }: { platform: string }) {
@@ -99,6 +100,7 @@ function RationaleBlock({ draft }: { draft: Draft }) {
 type PublishMode = "now" | "schedule" | "hold";
 
 export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () => void }) {
+  const brandName = useBrandName();
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState(draft.body ?? "");
   const [mode, setMode] = useState<PublishMode>("now");
@@ -243,6 +245,7 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
           platform={draft.platform}
           body={draft.body ?? ""}
           mediaAssetId={draft.media_asset_id}
+          brandName={brandName}
         />
       )}
 

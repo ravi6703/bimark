@@ -22,9 +22,15 @@ export type Platform = "linkedin" | "x" | "instagram" | "geo" | "youtube";
 export interface Brand {
   id: number;
   name: string;
+  /** URL-safe identifier (e.g. "leadup-universe") — how the dashboard/API pick
+   * which brand's workspace a request is for (multi-brand support). */
+  slug: string;
   voice_guide: string | null;
   visual_notes: string | null;
   banned_topics: string[] | null;
+  /** Per-brand competitor set for SOV/competitor-dashboard — each brand
+   * competes with different companies, so there's no one global list. */
+  default_competitors: string[] | null;
   created_at: Date;
 }
 

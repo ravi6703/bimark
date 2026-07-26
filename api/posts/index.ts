@@ -14,7 +14,7 @@ const DAY_MS = 24 * 3600 * 1000;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
   try {
-    const brandId = await resolveBrandId();
+    const brandId = await resolveBrandId(req);
     const now = new Date();
     const from = typeof req.query.from === "string" ? new Date(req.query.from) : new Date(now.getTime() - 7 * DAY_MS);
     const to = typeof req.query.to === "string" ? new Date(req.query.to) : new Date(now.getTime() + 35 * DAY_MS);

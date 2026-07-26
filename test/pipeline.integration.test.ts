@@ -148,7 +148,7 @@ d("end-to-end pipeline (§16 WF-1..WF-7)", () => {
 
   it("§7: quality stats are computable from the approvals log", async () => {
     const { approvals } = await import("../src/db/repositories/index.js");
-    const stats = await approvals.qualityStats();
+    const stats = await approvals.qualityStats(brandId);
     expect(stats.sample).toBeGreaterThanOrEqual(1);
   });
 

@@ -18,7 +18,7 @@ const VALID_STATUSES = new Set<TopicStatus>([
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
   try {
-    const brandId = await resolveBrandId();
+    const brandId = await resolveBrandId(req);
     const statusParam = typeof req.query.status === "string" ? req.query.status : undefined;
     const status =
       statusParam && VALID_STATUSES.has(statusParam as TopicStatus)

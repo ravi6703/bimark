@@ -14,7 +14,7 @@ import { isSovConfigured } from "../../src/workflows/wf7_sovMemo.js";
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
   try {
-    const brandId = await resolveBrandId();
+    const brandId = await resolveBrandId(req);
     const rows = await insights.list(brandId);
     res.status(200).json({ ok: true, insights: rows, sovConfigured: isSovConfigured() });
   } catch (err) {

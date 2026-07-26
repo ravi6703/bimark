@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
   try {
-    const brandId = await resolveBrandId();
+    const brandId = await resolveBrandId(req);
     const deleted = await competitorNotes.delete(id, brandId);
     if (!deleted) {
       res.status(404).json({ error: "note not found" });
