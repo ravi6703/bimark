@@ -4,7 +4,16 @@ import { buildMediaUrl } from "../images/index.js";
 import { editDistance } from "../metrics/editDistance.js";
 import { getPublisher } from "../publish/index.js";
 import { getTelegram } from "../telegram/client.js";
-import type { Draft, DraftStatus, Post } from "../types.js";
+import type { Draft, DraftStatus, Platform, Post } from "../types.js";
+
+/**
+ * Platforms with no "post to X" API to call — GEO has no platform to post
+ * generative-answer content to, YouTube has no video-generation pipeline to
+ * produce an actual upload from. Both always end in the held state and use
+ * markManuallyPosted() (the copy-out-and-record-it equivalent of a real
+ * publish) instead of publishHeldDraft().
+ */
+const NO_PUBLISH_PLATFORMS = new Set<Platform>(["geo", "youtube"]);
 
 /** Velocity polling window (§7.1): metrics are polled for this long after publish. */
 export const POLL_WINDOW_HOURS = 72;
@@ -54,12 +63,11 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
     input.editedText.trim() !== "" &&
     input.editedText.trim() !== aiBody.trim();
 
-  // GEO content (Okara-inspired follow-up) has no publish API to auto-post
-  // to — there's no "post to ChatGPT." It always ends in the held state,
-  // regardless of what publish mode was requested; markGeoPosted() below is
-  // its equivalent of publishHeldDraft() once the human has manually placed
-  // it in their own CMS/blog.
-  const hold = input.hold || draft.platform === "geo";
+  // GEO/YouTube (Okara-inspired follow-up) have no publish API to auto-post
+  // to. They always end in the held state, regardless of what publish mode
+  // was requested; markManuallyPosted() below is their equivalent of
+  // publishHeldDraft() once the human has manually placed/uploaded it.
+  const hold = input.hold || NO_PUBLISH_PLATFORMS.has(draft.platform as Platform);
 
   // Concurrency guard (audit Phase 0): claim the draft atomically, computing
   // the final target status up front, before doing anything else. Two
@@ -106,7 +114,9 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
     const holdMessage =
       draft.platform === "geo"
         ? `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — this is GEO content, so there's no platform to auto-publish to. Copy it into your CMS/blog from the dashboard, then mark it posted.`
-        : `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — holding. Publish it from the dashboard whenever you're ready.`;
+        : draft.platform === "youtube"
+          ? `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — this is a YouTube script, there's no video to auto-publish. Shoot/upload it yourself, then mark it posted.`
+          : `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — holding. Publish it from the dashboard whenever you're ready.`;
     await getTelegram().sendMessage({ text: holdMessage });
     logger.info(
       { draftId: draft.id, action, approver: input.approver, platform: draft.platform },
@@ -138,10 +148,10 @@ export async function publishHeldDraft(
 ): Promise<Post> {
   const draft = await drafts.get(draftId);
   if (!draft) throw new Error(`WF-5b: draft ${draftId} not found`);
-  if (draft.platform === "geo") {
+  if (NO_PUBLISH_PLATFORMS.has(draft.platform as Platform)) {
     throw new Error(
-      `WF-5b: draft ${draftId} is GEO content — there's no platform API to publish to; ` +
-        "use markGeoPosted() once it's been placed in your CMS/blog manually.",
+      `WF-5b: draft ${draftId} is ${draft.platform} content — there's no platform API to publish to; ` +
+        "use markManuallyPosted() once it's been placed/uploaded manually.",
     );
   }
 
@@ -162,26 +172,27 @@ export async function publishHeldDraft(
 }
 
 /**
- * GEO's equivalent of publishHeldDraft() (Okara-inspired follow-up). There's
- * no publish API for "your own website's CMS," so this doesn't call
- * getPublisher() at all — it just records that the human placed the content
- * themselves, the same way an Instagram/LinkedIn/X post gets a `posts` row,
- * so it still shows up in the calendar and posts-per-week rollup.
+ * GEO/YouTube's equivalent of publishHeldDraft() (Okara-inspired follow-up).
+ * There's no publish API for "your own website's CMS" or "upload this video,"
+ * so this doesn't call getPublisher() at all — it just records that the
+ * human placed/uploaded the content themselves, the same way an
+ * Instagram/LinkedIn/X post gets a `posts` row, so it still shows up in the
+ * calendar and posts-per-week rollup.
  */
-export async function markGeoPosted(draftId: number, approver: string): Promise<Post> {
+export async function markManuallyPosted(draftId: number, approver: string): Promise<Post> {
   const draft = await drafts.get(draftId);
-  if (!draft) throw new Error(`markGeoPosted: draft ${draftId} not found`);
-  if (draft.platform !== "geo") {
-    throw new Error(`markGeoPosted: draft ${draftId} is not GEO content (platform: ${draft.platform})`);
+  if (!draft) throw new Error(`markManuallyPosted: draft ${draftId} not found`);
+  if (!NO_PUBLISH_PLATFORMS.has(draft.platform as Platform)) {
+    throw new Error(`markManuallyPosted: draft ${draftId} isn't a manual-publish platform (platform: ${draft.platform})`);
   }
   const claimed = await drafts.claim(draftId, ["approved_hold"], "approved");
   if (!claimed) {
-    throw new Error(`markGeoPosted: draft ${draftId} is not held (current status: ${draft.status})`);
+    throw new Error(`markManuallyPosted: draft ${draftId} is not held (current status: ${draft.status})`);
   }
 
   const post = await posts.create({
     draft_id: draftId,
-    platform: "geo",
+    platform: draft.platform,
     external_id: null,
     url: null,
     scheduled_at: null,
@@ -189,8 +200,8 @@ export async function markGeoPosted(draftId: number, approver: string): Promise<
     poll_until: null, // no platform API to poll analytics from
   });
   await approvals.log({ draft_id: draftId, approver, action: "publish" });
-  await getTelegram().sendMessage({ text: `✅ Marked posted by ${approver} (GEO, posted manually).` });
-  logger.info({ draftId, approver }, "WF-5c: GEO draft marked posted");
+  await getTelegram().sendMessage({ text: `✅ Marked posted by ${approver} (${draft.platform}, posted manually).` });
+  logger.info({ draftId, approver, platform: draft.platform }, "WF-5c: draft marked posted manually");
   return post;
 }
 

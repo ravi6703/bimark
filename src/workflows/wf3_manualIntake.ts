@@ -16,7 +16,7 @@ import type { Draft } from "../types.js";
  * through the same brand-safety gate. `platform` (singular) is kept for
  * back-compat with earlier callers; `platforms` (plural) is preferred.
  */
-const PLATFORM = z.enum(["linkedin", "x", "instagram", "geo"]);
+const PLATFORM = z.enum(["linkedin", "x", "instagram", "geo", "youtube"]);
 
 /** Structured per-platform guidance (§20) — mirrors src/types.ts#PlatformExtra. */
 const platformDetailsSchema = z.object({
@@ -28,6 +28,9 @@ const platformDetailsSchema = z.object({
   // GEO (audit follow-up, Okara-inspired) — the exact question this piece
   // should directly answer, since that's what an AI answer engine extracts.
   geo: z.object({ targetQuestion: z.string().optional() }).optional(),
+  // YouTube (Okara-inspired follow-up) — a script/outline, not a finished
+  // video; see src/types.ts#YoutubeExtra.
+  youtube: z.object({ videoAngle: z.enum(["tutorial", "explainer", "interview-clip"]).optional() }).optional(),
 });
 
 export const manualIntakeSchema = z.object({

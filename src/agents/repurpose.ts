@@ -31,6 +31,7 @@ export async function repurpose(
     mustSay?: string | null;
     format?: string | null;
     platform?: TargetPlatform;
+    recentAngles?: string[];
   },
   llm: LlmProvider = getLlm(),
 ): Promise<RepurposeOutput> {
@@ -44,6 +45,7 @@ export async function repurpose(
     mustSay: input.mustSay ?? null,
     format: input.format ?? null,
     platform,
+    recentAngles: input.recentAngles,
   });
 
   const res = await llm.complete({

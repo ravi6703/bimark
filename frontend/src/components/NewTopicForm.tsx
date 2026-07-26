@@ -6,6 +6,7 @@ const PLATFORMS = [
   { key: "x", label: "X" },
   { key: "instagram", label: "Instagram" },
   { key: "geo", label: "GEO (AI answer engines)" },
+  { key: "youtube", label: "YouTube (script)" },
 ];
 
 export function NewTopicForm() {
@@ -25,6 +26,9 @@ export function NewTopicForm() {
     "" | "photography" | "illustration" | "infographic"
   >("");
   const [geoTargetQuestion, setGeoTargetQuestion] = useState("");
+  const [youtubeVideoAngle, setYoutubeVideoAngle] = useState<
+    "" | "tutorial" | "explainer" | "interview-clip"
+  >("");
 
   // Clarify step (§20) — the AI asks 1-2 questions when the topic is thin.
   const [questions, setQuestions] = useState<ClarifyQuestion[] | null>(null);
@@ -34,9 +38,28 @@ export function NewTopicForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Previous data for the open platform's pillar (Okara-inspired follow-up,
+  // "show previous data") — what's already been said, so a new topic doesn't
+  // just repeat it. Same recent-angles lookup that also feeds the prompt.
+  const [recentAngles, setRecentAngles] = useState<{ angle: string; status: string }[] | null>(null);
+  const [recentLoading, setRecentLoading] = useState(false);
+
   useEffect(() => {
     api.listPillars().then(setPillars).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!openPlatform) {
+      setRecentAngles(null);
+      return;
+    }
+    setRecentLoading(true);
+    api
+      .getRecentTopics(openPlatform, pillar || undefined)
+      .then(setRecentAngles)
+      .catch(() => setRecentAngles(null))
+      .finally(() => setRecentLoading(false));
+  }, [openPlatform, pillar]);
 
   function togglePlatform(key: string) {
     const has = platforms.includes(key);
@@ -67,6 +90,9 @@ export function NewTopicForm() {
     if (key === "geo") {
       return geoTargetQuestion ? `Answers: "${geoTargetQuestion}"` : "No target question set yet";
     }
+    if (key === "youtube") {
+      return youtubeVideoAngle ? `Angle: ${youtubeVideoAngle}` : "Letting the system pick the angle";
+    }
     return "";
   }
 
@@ -87,6 +113,9 @@ export function NewTopicForm() {
     if (platforms.includes("geo") && geoTargetQuestion) {
       details.geo = { targetQuestion: geoTargetQuestion };
     }
+    if (platforms.includes("youtube") && youtubeVideoAngle) {
+      details.youtube = { videoAngle: youtubeVideoAngle };
+    }
     return details;
   }
 
@@ -99,6 +128,7 @@ export function NewTopicForm() {
     setXAngleStyle("");
     setInstagramVisualStyle("");
     setGeoTargetQuestion("");
+    setYoutubeVideoAngle("");
     setQuestions(null);
     setAnswers({});
   }
@@ -248,6 +278,23 @@ export function NewTopicForm() {
                     role="region"
                     aria-labelledby={`accordion-header-${p.key}`}
                   >
+                    <div className="recent-angles-box">
+                      <div className="recent-angles-label">
+                        Previously covered{pillar ? ` — ${pillar} / ${p.label}` : ` — ${p.label}`}
+                      </div>
+                      {recentLoading && <span className="pillar-tag">Loading…</span>}
+                      {!recentLoading && recentAngles != null && recentAngles.length === 0 && (
+                        <span className="pillar-tag">Nothing yet — this'll be the first.</span>
+                      )}
+                      {!recentLoading && recentAngles != null && recentAngles.length > 0 && (
+                        <ul>
+                          {recentAngles.map((r, i) => (
+                            <li key={i}>{r.angle}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
                     {p.key === "linkedin" && (
                       <>
                         <label htmlFor="li-audience">Target audience (optional)</label>
@@ -321,6 +368,26 @@ export function NewTopicForm() {
                           ✨ Written to be found and cited by AI answer engines (ChatGPT, Perplexity),
                           not posted to a social feed — there's no auto-publish for this, you'll copy
                           it into your own site/CMS after approval.
+                        </div>
+                      </>
+                    )}
+
+                    {p.key === "youtube" && (
+                      <>
+                        <label htmlFor="yt-angle">Video angle (optional)</label>
+                        <select
+                          id="yt-angle"
+                          value={youtubeVideoAngle}
+                          onChange={(e) => setYoutubeVideoAngle(e.target.value as typeof youtubeVideoAngle)}
+                        >
+                          <option value="">Let the system pick</option>
+                          <option value="tutorial">Tutorial — step-by-step, actionable</option>
+                          <option value="explainer">Explainer — builds understanding of a concept</option>
+                          <option value="interview-clip">Interview clip — short, talking-points style</option>
+                        </select>
+                        <div className="pillar-tag" style={{ marginTop: 6 }}>
+                          🎬 There's no video-generation pipeline — this produces a script/outline
+                          (title, hook, talking points, CTA) for a human to shoot and upload.
                         </div>
                       </>
                     )}

@@ -115,6 +115,20 @@ export function PlatformPreview({
     );
   }
 
+  if (platform === "youtube") {
+    const titleMatch = body.match(/^TITLE:\s*(.+)$/m);
+    return (
+      <div className="platform-preview pv-youtube">
+        <div className="pv-yt-tag">🎬 YouTube — a script/outline for a human to shoot, not a finished video</div>
+        <div className="pv-yt-thumb">
+          <span className="pv-yt-play">▶</span>
+          {titleMatch && <span className="pv-yt-thumb-title">{titleMatch[1]}</span>}
+        </div>
+        <pre className="pv-body pv-yt-script">{body}</pre>
+      </div>
+    );
+  }
+
   // Default: LinkedIn.
   return (
     <div className="platform-preview pv-linkedin">

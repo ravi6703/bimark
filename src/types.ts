@@ -17,7 +17,7 @@ export type DraftStatus =
   | "approved_hold" // approved but held — no platform draft API exists, so it waits here for a manual publish
   | "edited"
   | "rejected";
-export type Platform = "linkedin" | "x" | "instagram" | "geo";
+export type Platform = "linkedin" | "x" | "instagram" | "geo" | "youtube";
 
 export interface Brand {
   id: number;
@@ -82,7 +82,14 @@ export interface InstagramExtra {
 export interface GeoExtra {
   targetQuestion?: string;
 }
-export type PlatformExtra = LinkedInExtra | XExtra | InstagramExtra | GeoExtra;
+/** YouTube — bimark has no video-generation pipeline, so this drafts a
+ * script/outline (title, hook, talking points) for a human to shoot and
+ * upload, not a finished video. No publish API exists for this either;
+ * see wf5_approvalCallback.ts's youtube handling (same "hold" pattern as GEO). */
+export interface YoutubeExtra {
+  videoAngle?: "tutorial" | "explainer" | "interview-clip";
+}
+export type PlatformExtra = LinkedInExtra | XExtra | InstagramExtra | GeoExtra | YoutubeExtra;
 
 export interface Topic {
   id: number;
@@ -133,6 +140,11 @@ export interface DraftWithContext extends Draft {
   topic_angle: string | null;
   pillar_name: string | null;
   brand_id: number;
+  /** Rationale fields (Okara-inspired follow-up) — why this draft exists at all. */
+  topic_why_now: string | null;
+  topic_source: TopicSource | null;
+  topic_format_hint: string | null;
+  topic_platform_extra: PlatformExtra | null;
 }
 
 export interface MediaAsset {
