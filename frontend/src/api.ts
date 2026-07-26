@@ -68,6 +68,7 @@ export interface Draft {
   pillar_name: string | null;
   repetitive: boolean;
   similar_to_draft_id: number | null;
+  geo_readiness?: { score: number; checks: { label: string; pass: boolean }[] };
 }
 export interface Topic {
   id: number;
@@ -276,10 +277,10 @@ export const api = {
     return request(`/drafts/${id}/mark-posted`, { method: "POST" });
   },
 
-  async proposeOnboarding(url: string): Promise<OnboardingProposal> {
+  async proposeOnboarding(url: string, pageText?: string): Promise<OnboardingProposal> {
     const { proposal } = await request<{ proposal: OnboardingProposal }>("/onboarding/propose", {
       method: "POST",
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, pageText }),
     });
     return proposal;
   },
