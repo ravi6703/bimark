@@ -17,7 +17,7 @@ export type DraftStatus =
   | "approved_hold" // approved but held — no platform draft API exists, so it waits here for a manual publish
   | "edited"
   | "rejected";
-export type Platform = "linkedin" | "x" | "instagram";
+export type Platform = "linkedin" | "x" | "instagram" | "geo";
 
 export interface Brand {
   id: number;
@@ -76,7 +76,13 @@ export interface XExtra {
 export interface InstagramExtra {
   visualStyle?: "photography" | "illustration" | "infographic";
 }
-export type PlatformExtra = LinkedInExtra | XExtra | InstagramExtra;
+/** GEO (generative-engine optimization) — content aimed at being cited by AI
+ * answer engines, not a social platform. No publish API exists for this
+ * (there's no "post to ChatGPT"); see wf5_approvalCallback.ts's geo handling. */
+export interface GeoExtra {
+  targetQuestion?: string;
+}
+export type PlatformExtra = LinkedInExtra | XExtra | InstagramExtra | GeoExtra;
 
 export interface Topic {
   id: number;
@@ -173,4 +179,14 @@ export interface ApprovalEntry {
   reason: string | null;
   edit_distance: number | null;
   created_at: Date;
+}
+
+/** AI-derived onboarding proposal (Okara-inspired) — read a URL, propose a
+ * starting brand profile. Purely a proposal: nothing is persisted until the
+ * human reviews and explicitly applies it. */
+export interface BrandProfileProposal {
+  voiceGuide: string;
+  visualNotes: string;
+  bannedTopics: string[];
+  pillars: { name: string; description: string }[];
 }

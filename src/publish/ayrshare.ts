@@ -85,5 +85,12 @@ export class AyrsharePublisher implements Publisher {
  * 1:1.
  */
 function toAyrsharePlatform(platform: string): string {
+  if (platform === "geo") {
+    // Belt-and-suspenders: WF-5 always routes GEO content to the hold state
+    // and never calls publishNow() for it, so reaching here means that guard
+    // was bypassed somewhere — fail loudly rather than post nonsense to
+    // whatever Ayrshare does with an unrecognized platform string.
+    throw new Error("GEO content has no publish API — this should never reach the publisher");
+  }
   return platform === "x" ? "twitter" : platform;
 }

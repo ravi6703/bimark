@@ -50,7 +50,7 @@ Return ONLY JSON: {"A":{"angle","pillar","asset_id","why_now"},
  * no image generation) — matches what's actually built (§20: image gen is a
  * later phase).
  */
-export type TargetPlatform = "linkedin" | "x" | "instagram";
+export type TargetPlatform = "linkedin" | "x" | "instagram" | "geo";
 
 function platformSpec(platform: TargetPlatform): string {
   switch (platform) {
@@ -63,6 +63,17 @@ At most 1 hashtag. No thread — one post only.`;
 LinkedIn but still credible (never hype-y). End with up to 5 relevant,
 specific hashtags (no generic tags like #motivation). This is a CAPTION —
 assume an image/carousel accompanies it; do not describe a nonexistent visual.`;
+    case "geo":
+      return `PLATFORM: none — this is GEO content (generative-engine optimization): a
+direct-answer piece written to be found and cited by AI answer engines
+(ChatGPT, Perplexity, AI Overviews), not posted to a social feed. Structure:
+- Open with the target question as a heading, then answer it in the FIRST
+  sentence, plainly and completely — assume the reader/crawler only ever
+  sees that first sentence.
+- 150-400 words. Plain factual prose, not persuasion — no hooks, no CTAs,
+  no hashtags, no engagement bait. Short paragraphs, each making one point.
+- Every factual claim must be independently checkable against the source
+  material — this is written to be QUOTED as fact, so it must earn that.`;
     case "linkedin":
     default:
       return `PLATFORM: LinkedIn. 120-200 words. No hashtag spam (max 3, relevant).`;
@@ -121,7 +132,9 @@ Review the draft against this checklist and BLOCK anything that fails.`;
   const lengthCheck =
     input.platform === "x"
       ? "6. Is <=280 characters total (X's hard limit)."
-      : "6. Fits the platform's length norm (roughly 120-200 words for LinkedIn, a short caption for Instagram).";
+      : input.platform === "geo"
+        ? "6. Opens with a direct, complete answer to the target question in the first sentence; 150-400 words; every claim is independently checkable against the source — this will be quoted as fact."
+        : "6. Fits the platform's length norm (roughly 120-200 words for LinkedIn, a short caption for Instagram).";
   const user = `DRAFT: ${input.draft}
 CLAIMS_USED: ${input.claimsUsed}   SOURCE MATERIAL: ${input.retrievedChunks}
 BANNED TOPICS: ${input.bannedTopics}   VOICE GUIDE: ${input.voiceGuide}
@@ -189,6 +202,42 @@ Return ONLY JSON:
 {"sufficient": false, "questions": [{"platform": "linkedin", "question": "..."}]}
   — at most 2 questions total, each tied to a specific platform, short and
   concrete. No preamble, no markdown.`;
+  return { system, user };
+}
+
+/**
+ * AI-derived onboarding (Okara-inspired). Reads a company's own public site
+ * text and proposes a starting brand profile — pillars, voice guide, banned
+ * topics — instead of requiring someone to hand-author it from a blank page.
+ * A proposal only: the human reviews and edits before anything is applied
+ * (see api/onboarding/propose.ts — nothing here writes to the DB).
+ */
+export function onboardingPrompt(input: {
+  url: string;
+  pageText: string;
+}): { system: string; user: string } {
+  const system = `You are a B2B brand strategist setting up a new client's content
+strategy from scratch. You have one source of truth: their own public
+website text. Propose a grounded starting point, not a generic template —
+name pillars from what THIS company actually says it does, not boilerplate
+"innovation" or "excellence" pillars.`;
+  const user = `COMPANY URL: ${input.url}
+PUBLIC SITE TEXT (homepage, best-effort extraction): ${input.pageText.slice(0, 6000)}
+
+Propose:
+1. A voice guide (like a brand style sheet): audience, personality, a
+   handful of do's/don'ts, one memorable "litmus test" sentence for whether
+   a post is on-brand.
+2. Visual notes: a short description of the visual style content should use.
+3. Banned topics: obvious sensitive/off-limits topics for this specific
+   company (competitors it shouldn't bash, claims it can't make, etc.) —
+   infer from context, don't invent specifics you can't see evidence for.
+4. 3-5 content pillars: named from THIS company's actual stated focus areas,
+   each with a one-line description of what it covers.
+
+Return ONLY JSON: {"voiceGuide":"...", "visualNotes":"...",
+"bannedTopics":["..."], "pillars":[{"name":"...","description":"..."}]}.
+No preamble, no markdown.`;
   return { system, user };
 }
 

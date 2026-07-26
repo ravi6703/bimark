@@ -33,6 +33,31 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
   const needsImage = draft.platform === "instagram";
   const imageFailed = needsImage && draft.media_asset_id == null;
   const held = draft.status === "approved_hold";
+  // GEO content has no publish API — there's no "post to ChatGPT" — so it
+  // always ends up held, and its "publish" action is copy-out + mark-posted
+  // instead of an automatic publish (Okara-inspired follow-up).
+  const isGeo = draft.platform === "geo";
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard?.writeText(draft.body ?? "").then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  async function handleMarkPosted() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.markPosted(draft.id);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Mark-as-posted failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function useVariant(text: string) {
     setEditedText(text);
@@ -67,7 +92,7 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
       await api.approveDraft(draft.id, {
         editedText: editing ? editedText : undefined,
         scheduledAt: mode === "schedule" ? new Date(scheduledAt).toISOString() : undefined,
-        hold: mode === "hold",
+        hold: isGeo || mode === "hold",
       });
       onChanged();
     } catch (err) {
@@ -217,64 +242,91 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
 
       {held ? (
         <>
-          <div className="meta-note">✅ Approved — held. Publish it yourself whenever you're ready.</div>
+          <div className="meta-note">
+            {isGeo
+              ? "✅ Approved — GEO content has no platform to auto-publish to. Copy it into your own site/CMS, then mark it posted."
+              : "✅ Approved — held. Publish it yourself whenever you're ready."}
+          </div>
           <div className="row">
-            <button className="btn primary" onClick={handlePublishHeld} disabled={busy}>
-              🚀 {busy ? "Publishing…" : "Publish now"}
-            </button>
+            {isGeo ? (
+              <>
+                <button className="btn" onClick={handleCopy}>
+                  📋 {copied ? "Copied!" : "Copy markdown"}
+                </button>
+                <button className="btn primary" onClick={handleMarkPosted} disabled={busy}>
+                  ✅ {busy ? "Marking…" : "Mark as posted"}
+                </button>
+              </>
+            ) : (
+              <button className="btn primary" onClick={handlePublishHeld} disabled={busy}>
+                🚀 {busy ? "Publishing…" : "Publish now"}
+              </button>
+            )}
           </div>
         </>
       ) : (
         <>
-          <fieldset className="publish-mode-row">
-            <legend>Publish mode</legend>
-            <label>
-              <input
-                type="radio"
-                name={`mode-${draft.id}`}
-                checked={mode === "now"}
-                onChange={() => setMode("now")}
-              />
-              Publish now
-            </label>
-            <label>
-              <input
-                type="radio"
-                name={`mode-${draft.id}`}
-                checked={mode === "schedule"}
-                onChange={() => setMode("schedule")}
-              />
-              Schedule
-            </label>
-            <label>
-              <input
-                type="radio"
-                name={`mode-${draft.id}`}
-                checked={mode === "hold"}
-                onChange={() => setMode("hold")}
-              />
-              Approve &amp; hold (publish manually later)
-            </label>
-          </fieldset>
-          {mode === "schedule" && (
-            <input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              style={{ marginTop: 8 }}
-            />
+          {!isGeo && (
+            <>
+              <fieldset className="publish-mode-row">
+                <legend>Publish mode</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name={`mode-${draft.id}`}
+                    checked={mode === "now"}
+                    onChange={() => setMode("now")}
+                  />
+                  Publish now
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name={`mode-${draft.id}`}
+                    checked={mode === "schedule"}
+                    onChange={() => setMode("schedule")}
+                  />
+                  Schedule
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name={`mode-${draft.id}`}
+                    checked={mode === "hold"}
+                    onChange={() => setMode("hold")}
+                  />
+                  Approve &amp; hold (publish manually later)
+                </label>
+              </fieldset>
+              {mode === "schedule" && (
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  style={{ marginTop: 8 }}
+                />
+              )}
+            </>
+          )}
+          {isGeo && (
+            <div className="meta-note" style={{ marginTop: 8 }}>
+              ✨ GEO content — approving copies it out for your own site/CMS, there's nowhere to
+              auto-publish it to.
+            </div>
           )}
 
           <div className="row">
             <button className="btn primary" onClick={handleApprove} disabled={busy}>
               ✅{" "}
-              {mode === "hold"
-                ? "Approve & hold"
-                : mode === "schedule"
-                  ? "Schedule"
-                  : editing
-                    ? "Approve with edits"
-                    : "Approve"}
+              {isGeo
+                ? "Approve"
+                : mode === "hold"
+                  ? "Approve & hold"
+                  : mode === "schedule"
+                    ? "Schedule"
+                    : editing
+                      ? "Approve with edits"
+                      : "Approve"}
             </button>
             <button className="btn" onClick={() => setEditing((v) => !v)} disabled={busy}>
               ✏️ {editing ? "Cancel edit" : "Edit"}

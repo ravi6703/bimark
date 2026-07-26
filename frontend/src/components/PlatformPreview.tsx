@@ -106,6 +106,15 @@ export function PlatformPreview({
     );
   }
 
+  if (platform === "geo") {
+    return (
+      <div className="platform-preview pv-geo">
+        <div className="pv-geo-tag">✨ GEO — written to be found and cited by AI answer engines</div>
+        <p className="pv-body pv-geo-body">{body}</p>
+      </div>
+    );
+  }
+
   // Default: LinkedIn.
   return (
     <div className="platform-preview pv-linkedin">

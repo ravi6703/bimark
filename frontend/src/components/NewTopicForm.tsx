@@ -5,6 +5,7 @@ const PLATFORMS = [
   { key: "linkedin", label: "LinkedIn" },
   { key: "x", label: "X" },
   { key: "instagram", label: "Instagram" },
+  { key: "geo", label: "GEO (AI answer engines)" },
 ];
 
 export function NewTopicForm() {
@@ -23,6 +24,7 @@ export function NewTopicForm() {
   const [instagramVisualStyle, setInstagramVisualStyle] = useState<
     "" | "photography" | "illustration" | "infographic"
   >("");
+  const [geoTargetQuestion, setGeoTargetQuestion] = useState("");
 
   // Clarify step (§20) — the AI asks 1-2 questions when the topic is thin.
   const [questions, setQuestions] = useState<ClarifyQuestion[] | null>(null);
@@ -62,6 +64,9 @@ export function NewTopicForm() {
         ? `Visual: ${instagramVisualStyle}`
         : "Letting the system pick the visual style";
     }
+    if (key === "geo") {
+      return geoTargetQuestion ? `Answers: "${geoTargetQuestion}"` : "No target question set yet";
+    }
     return "";
   }
 
@@ -79,6 +84,9 @@ export function NewTopicForm() {
     if (platforms.includes("instagram") && instagramVisualStyle) {
       details.instagram = { visualStyle: instagramVisualStyle };
     }
+    if (platforms.includes("geo") && geoTargetQuestion) {
+      details.geo = { targetQuestion: geoTargetQuestion };
+    }
     return details;
   }
 
@@ -90,6 +98,7 @@ export function NewTopicForm() {
     setLinkedinCta("");
     setXAngleStyle("");
     setInstagramVisualStyle("");
+    setGeoTargetQuestion("");
     setQuestions(null);
     setAnswers({});
   }
@@ -294,6 +303,24 @@ export function NewTopicForm() {
                         <div className="pillar-tag" style={{ marginTop: 6 }}>
                           🖼️ Instagram drafts get an AI-generated image attached automatically — no
                           manual upload.
+                        </div>
+                      </>
+                    )}
+
+                    {p.key === "geo" && (
+                      <>
+                        <label htmlFor="geo-question">Question this piece should directly answer</label>
+                        <input
+                          id="geo-question"
+                          type="text"
+                          value={geoTargetQuestion}
+                          onChange={(e) => setGeoTargetQuestion(e.target.value)}
+                          placeholder="e.g. What is skills-based hiring?"
+                        />
+                        <div className="pillar-tag" style={{ marginTop: 6 }}>
+                          ✨ Written to be found and cited by AI answer engines (ChatGPT, Perplexity),
+                          not posted to a social feed — there's no auto-publish for this, you'll copy
+                          it into your own site/CMS after approval.
                         </div>
                       </>
                     )}

@@ -11,6 +11,7 @@ import { getTelegram } from "../telegram/client.js";
 import { draftPreviewMessage } from "../telegram/messages.js";
 import type {
   Draft,
+  GeoExtra,
   InstagramExtra,
   LinkedInExtra,
   ReviewerResult,
@@ -219,7 +220,7 @@ async function resolvePillarName(topic: Topic): Promise<string> {
   return list.find((p) => p.id === topic.pillar_id)?.name ?? "";
 }
 
-const VALID_PLATFORMS = new Set<TargetPlatform>(["linkedin", "x", "instagram"]);
+const VALID_PLATFORMS = new Set<TargetPlatform>(["linkedin", "x", "instagram", "geo"]);
 function normalizePlatform(p: string): TargetPlatform {
   return VALID_PLATFORMS.has(p as TargetPlatform) ? (p as TargetPlatform) : "linkedin";
 }
@@ -254,6 +255,10 @@ function extraGuidance(platform: TargetPlatform, extra: Topic["platform_extra"])
       default:
         return null;
     }
+  }
+  if (platform === "geo") {
+    const { targetQuestion } = extra as GeoExtra;
+    return targetQuestion ? `Directly answer this question: ${targetQuestion}` : null;
   }
   return null; // instagram's platform_extra is visual-only, applied to the image prompt
 }
