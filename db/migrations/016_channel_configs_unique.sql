@@ -18,5 +18,13 @@ DELETE FROM channel_configs c
       AND keep.id < c.id
  );
 
-ALTER TABLE channel_configs
-  ADD CONSTRAINT channel_configs_brand_platform_key UNIQUE (brand_id, platform);
+-- Guarded so re-running is a no-op: ADD CONSTRAINT has no IF NOT EXISTS, and
+-- an unguarded one aborts the whole script when the constraint is already
+-- there — which matters when this is pasted into a SQL console by hand rather
+-- than run through the migration runner's once-only bookkeeping.
+DO $$ BEGIN
+  ALTER TABLE channel_configs
+    ADD CONSTRAINT channel_configs_brand_platform_key UNIQUE (brand_id, platform);
+EXCEPTION
+  WHEN duplicate_table OR duplicate_object THEN NULL;
+END $$;
