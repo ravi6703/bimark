@@ -1,5 +1,6 @@
 import { config } from "../config.js";
 import { logger } from "../logger.js";
+import { platformFor } from "../platforms/index.js";
 import type { PostMetrics, PublishCredentials, PublishRequest, PublishResult, Publisher } from "./types.js";
 
 /**
@@ -91,12 +92,13 @@ export class AyrsharePublisher implements Publisher {
  * 1:1.
  */
 function toAyrsharePlatform(platform: string): string {
-  if (platform === "geo" || platform === "youtube") {
+  if (!platformFor(platform).autoPublish) {
     // Belt-and-suspenders: WF-5 always routes GEO/YouTube content to the hold
     // state and never calls publishNow() for it, so reaching here means that
     // guard was bypassed somewhere — fail loudly rather than post nonsense to
     // whatever Ayrshare does with an unrecognized platform string.
     throw new Error(`${platform} content has no publish API — this should never reach the publisher`);
   }
-  return platform === "x" ? "twitter" : platform;
+  const def = platformFor(platform);
+  return def.publishAs ?? def.key;
 }

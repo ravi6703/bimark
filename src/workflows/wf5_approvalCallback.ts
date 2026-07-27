@@ -1,4 +1,5 @@
 import { logger } from "../logger.js";
+import { platformFor } from "../platforms/index.js";
 import { approvals, brands, drafts, mediaAssets, posts, topics } from "../db/repositories/index.js";
 import { buildMediaUrl } from "../images/index.js";
 import { editDistance } from "../metrics/editDistance.js";
@@ -25,13 +26,16 @@ async function brandPublishCreds(topicId: number): Promise<PublishCredentials> {
 }
 
 /**
- * Platforms with no "post to X" API to call — GEO has no platform to post
- * generative-answer content to, YouTube has no video-generation pipeline to
- * produce an actual upload from. Both always end in the held state and use
+ * Whether this channel has no "post to X" API to call — GEO has no platform to
+ * post generative-answer content to, YouTube no video pipeline to produce an
+ * upload from. Such drafts always end in the held state and use
  * markManuallyPosted() (the copy-out-and-record-it equivalent of a real
- * publish) instead of publishHeldDraft().
+ * publish) instead of publishHeldDraft(). Which channels those are is the
+ * registry's call (src/platforms), not a list maintained here.
  */
-const NO_PUBLISH_PLATFORMS = new Set<Platform>(["geo", "youtube"]);
+function isManualPublish(platform: string): boolean {
+  return !platformFor(platform).autoPublish;
+}
 
 /** Velocity polling window (§7.1): metrics are polled for this long after publish. */
 export const POLL_WINDOW_HOURS = 72;
@@ -85,7 +89,7 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
   // to. They always end in the held state, regardless of what publish mode
   // was requested; markManuallyPosted() below is their equivalent of
   // publishHeldDraft() once the human has manually placed/uploaded it.
-  const hold = input.hold || NO_PUBLISH_PLATFORMS.has(draft.platform as Platform);
+  const hold = input.hold || isManualPublish(draft.platform);
 
   // Concurrency guard (audit Phase 0): claim the draft atomically, computing
   // the final target status up front, before doing anything else. Two
@@ -129,12 +133,11 @@ export async function finalizeDraft(input: FinalizeInput): Promise<FinalizeResul
   if (edited) await drafts.setBody(draft.id, finalText, "edited");
 
   if (hold) {
-    const holdMessage =
-      draft.platform === "geo"
-        ? `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — this is GEO content, so there's no platform to auto-publish to. Copy it into your CMS/blog from the dashboard, then mark it posted.`
-        : draft.platform === "youtube"
-          ? `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — this is a YouTube script, there's no video to auto-publish. Shoot/upload it yourself, then mark it posted.`
-          : `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver} — holding. Publish it from the dashboard whenever you're ready.`;
+    const approvedBy = `✅ ${action === "edit" ? "Approved with edits" : "Approved"} by ${input.approver}`;
+    const note = platformFor(draft.platform).manualPublishNote;
+    const holdMessage = note
+      ? `${approvedBy} — ${note}`
+      : `${approvedBy} — holding. Publish it from the dashboard whenever you're ready.`;
     await getTelegram().sendMessage({ text: holdMessage });
     logger.info(
       { draftId: draft.id, action, approver: input.approver, platform: draft.platform },
@@ -166,7 +169,7 @@ export async function publishHeldDraft(
 ): Promise<Post> {
   const draft = await drafts.get(draftId);
   if (!draft) throw new Error(`WF-5b: draft ${draftId} not found`);
-  if (NO_PUBLISH_PLATFORMS.has(draft.platform as Platform)) {
+  if (isManualPublish(draft.platform)) {
     throw new Error(
       `WF-5b: draft ${draftId} is ${draft.platform} content — there's no platform API to publish to; ` +
         "use markManuallyPosted() once it's been placed/uploaded manually.",
@@ -200,7 +203,7 @@ export async function publishHeldDraft(
 export async function markManuallyPosted(draftId: number, approver: string): Promise<Post> {
   const draft = await drafts.get(draftId);
   if (!draft) throw new Error(`markManuallyPosted: draft ${draftId} not found`);
-  if (!NO_PUBLISH_PLATFORMS.has(draft.platform as Platform)) {
+  if (!isManualPublish(draft.platform)) {
     throw new Error(`markManuallyPosted: draft ${draftId} isn't a manual-publish platform (platform: ${draft.platform})`);
   }
   const claimed = await drafts.claim(draftId, ["approved_hold"], "approved");
@@ -240,9 +243,10 @@ async function publishNow(
     mediaUrlsOverride?.length ? mediaUrlsOverride
     : generatedAssets.length ? generatedAssets.map((a) => buildMediaUrl(a.id))
     : undefined;
-  if (draft.platform === "instagram" && !mediaUrls?.length) {
+  const def = platformFor(draft.platform);
+  if (def.requiresMedia && !mediaUrls?.length) {
     throw new Error(
-      "Instagram posts require an image — image generation failed for this draft; " +
+      `${def.label} posts require an image — image generation failed for this draft; ` +
         "pass mediaUrls explicitly to publish it anyway.",
     );
   }

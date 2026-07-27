@@ -33,7 +33,7 @@ describe("Image generation (§20)", () => {
     const square = imagePrompt({ angle: "an idea", pillar: "" });
     expect(square).toContain("Square 1:1 composition");
 
-    const landscape = imagePrompt({ angle: "an idea", pillar: "", platform: "linkedin" });
+    const landscape = imagePrompt({ angle: "an idea", pillar: "", aspect: "landscape" });
     expect(landscape).toContain("Landscape 1.91:1 composition");
     expect(landscape).not.toContain("Square 1:1");
   });
@@ -42,7 +42,7 @@ describe("Image generation (§20)", () => {
     const withHint = imagePrompt({
       angle: "an idea",
       pillar: "",
-      platform: "linkedin",
+      aspect: "landscape",
       variationHint: "Image 2 of 3: a different visual angle/composition than the others, same topic and style.",
     });
     expect(withHint).toContain("Image 2 of 3");
