@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type Campaign } from "../api";
 import { EmptyState } from "./EmptyState";
+import { platformLabel } from "../platforms";
 
 /** Where a channel currently stands, in words rather than raw enum names. */
 function channelState(status: string, draftStatus: string | null): { icon: string; label: string } {
@@ -90,7 +91,7 @@ export function CampaignsView({ onNavigate }: { onNavigate: (tab: string) => voi
                   const state = channelState(ch.status, ch.draftStatus);
                   return (
                     <span key={ch.topicId} className="campaign-channel">
-                      <b>{ch.platform === "x" ? "X" : ch.platform}</b>
+                      <b>{platformLabel(ch.platform)}</b>
                       <span className="pillar-tag">
                         {state.icon} {state.label}
                       </span>

@@ -1,13 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type ClarifyQuestion, type Pillar, type PlatformDetails } from "../api";
+import { PLATFORMS as PLATFORM_UI } from "../platforms";
 
-const PLATFORMS = [
-  { key: "linkedin", label: "LinkedIn" },
-  { key: "x", label: "X" },
-  { key: "instagram", label: "Instagram" },
-  { key: "geo", label: "GEO (AI answer engines)" },
-  { key: "youtube", label: "YouTube (script)" },
-];
+// The picker uses the longer disambiguating labels; the tab/badge form of
+// the same channels lives alongside them in src/platforms.ts.
+const PLATFORMS = PLATFORM_UI.map((p) => ({ key: p.key, label: p.pickerLabel }));
 
 export function NewTopicForm() {
   const [pillars, setPillars] = useState<Pillar[]>([]);

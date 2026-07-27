@@ -3,6 +3,7 @@ import { api, ApiError, type Draft } from "../api";
 import { DraftCard } from "./DraftCard";
 import { EmptyState } from "./EmptyState";
 import { InfoCallout } from "./InfoCallout";
+import { PLATFORMS as PLATFORM_UI, platformUi } from "../platforms";
 
 const STATUSES = [
   { key: "pending_approval", label: "Needs review" },
@@ -17,39 +18,7 @@ const STATUSES = [
 // platform's drafts sat in one blended list; that made it hard to review
 // LinkedIn in one pass, Instagram in another, etc. This tab sits ABOVE the
 // status filter, so "LinkedIn, needs review" is its own clean view.
-const PLATFORMS = [
-  { key: "all", label: "All platforms", icon: "🗂️" },
-  { key: "linkedin", label: "LinkedIn", icon: "💼" },
-  { key: "instagram", label: "Instagram", icon: "📸" },
-  { key: "x", label: "X", icon: "✖️" },
-  { key: "geo", label: "GEO", icon: "✨" },
-  { key: "youtube", label: "YouTube", icon: "🎬" },
-];
-
-// What each platform tab actually means — shown so "GEO" and "YouTube" aren't
-// unexplained jargon sitting next to the familiar social platforms. GEO and
-// YouTube get a collapsed "why" (same InfoCallout pattern as the intelligence
-// tabs) since their explanation genuinely needs more than one line; the three
-// familiar platforms don't, so they stay a single plain line.
-const PLATFORM_EXPLAINERS: Record<string, { icon: string; summary: string; detail?: string }> = {
-  linkedin: { icon: "💼", summary: "Long-form thought-leadership posts, published automatically once approved." },
-  instagram: { icon: "📸", summary: "Caption + an auto-generated image, published automatically once approved." },
-  x: { icon: "✖️", summary: "Short, single-idea posts, published automatically once approved." },
-  geo: {
-    icon: "✨",
-    summary: "A direct-answer article for AI answer engines (ChatGPT, Perplexity) — not a social post.",
-    detail:
-      'GEO = Generative-Engine Optimization. There\'s no publish API for that, so approving it just ' +
-      'copies the text out for you to place on your own site/CMS, then "Mark as posted" logs it here.',
-  },
-  youtube: {
-    icon: "🎬",
-    summary: "A script/outline for a video, not a finished video.",
-    detail:
-      'Nothing is filmed or uploaded automatically. Approving locks the script in for you to shoot ' +
-      'and upload yourself, then "Mark as posted" logs it here.',
-  },
-};
+const PLATFORMS = [{ key: "all", label: "All platforms", icon: "🗂️" }, ...PLATFORM_UI];
 
 export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void } = {}) {
   const [status, setStatus] = useState("pending_approval");
@@ -68,6 +37,9 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
     () => (platform === "all" ? drafts : drafts.filter((d) => d.platform === platform)),
     [drafts, platform],
   );
+
+  /** The selected platform's presentation config — undefined on "all". */
+  const activeUi = platform === "all" ? undefined : platformUi(platform);
 
   async function load() {
     setLoading(true);
@@ -127,17 +99,15 @@ export function DraftQueue({ onDraftsChanged }: { onDraftsChanged?: () => void }
         })}
       </div>
 
-      {platform !== "all" &&
-        PLATFORM_EXPLAINERS[platform] &&
-        (PLATFORM_EXPLAINERS[platform].detail ? (
-          <InfoCallout
-            icon={PLATFORM_EXPLAINERS[platform].icon}
-            summary={PLATFORM_EXPLAINERS[platform].summary}
-            detail={PLATFORM_EXPLAINERS[platform].detail!}
-          />
+      {/* What this platform tab actually means — GEO and YouTube need more
+          than a line, so they get the collapsible treatment; the familiar
+          three don't. Copy lives in src/platforms.ts. */}
+      {activeUi &&
+        (activeUi.queueDetail ? (
+          <InfoCallout icon={activeUi.icon} summary={activeUi.queueSummary} detail={activeUi.queueDetail} />
         ) : (
           <div className="callout-box" style={{ marginBottom: 16 }}>
-            {PLATFORM_EXPLAINERS[platform].icon} {PLATFORM_EXPLAINERS[platform].summary}
+            {activeUi.icon} {activeUi.queueSummary}
           </div>
         ))}
 
