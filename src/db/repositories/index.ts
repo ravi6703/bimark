@@ -338,6 +338,40 @@ export const topics = {
   async setStatusForGroup(pitchGroup: string, status: TopicStatus): Promise<void> {
     await query("UPDATE topics SET status = $2 WHERE pitch_group = $1", [pitchGroup, status]);
   },
+  /**
+   * Atomically move a topic picked -> drafting, returning the row only if THIS
+   * caller won the transition. Async intake means the same topic can now be
+   * generated from two places at once (the browser firing per-platform
+   * generates, and the drain cron sweeping up anything the browser dropped),
+   * so the claim has to be the DB's decision, not a read-then-write race —
+   * same concurrency posture as finalizeDraft. Returns null when someone else
+   * already claimed it (or it isn't in `picked`).
+   */
+  async claimForDrafting(id: number): Promise<Topic | null> {
+    const { rows } = await query<Topic>(
+      "UPDATE topics SET status = 'drafting' WHERE id = $1 AND status = 'picked' RETURNING *",
+      [id],
+    );
+    return rows[0] ?? null;
+  },
+  /**
+   * Topics queued for generation that nobody ever picked up — the drain cron's
+   * work list (WF-3 async intake). A topic goes picked -> drafting the instant
+   * generation starts, so anything still `picked` after `minAgeMinutes` was
+   * dropped (browser tab closed mid-generate, network failure, function
+   * eviction) and needs sweeping up.
+   */
+  async listPendingGeneration(minAgeMinutes = 5, limit = 10): Promise<Topic[]> {
+    const { rows } = await query<Topic>(
+      `SELECT * FROM topics
+        WHERE status = 'picked'
+          AND created_at < now() - ($1 || ' minutes')::interval
+        ORDER BY priority DESC, created_at ASC
+        LIMIT $2`,
+      [minAgeMinutes, limit],
+    );
+    return rows;
+  },
   /** Highest-priority queued topic — manual topics outrank pitch picks (§4.2). */
   async nextQueued(brandId: number): Promise<Topic | null> {
     const { rows } = await query<Topic>(
