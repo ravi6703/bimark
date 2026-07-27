@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { logger } from "../logger.js";
-import { pillars, topics } from "../db/repositories/index.js";
+import { campaigns, pillars, topics } from "../db/repositories/index.js";
 import { runRepurposeReview } from "./wf4_repurposeReview.js";
 import type { Draft } from "../types.js";
 
@@ -59,6 +59,11 @@ export interface QueuedTopic {
   topicId: number;
 }
 
+export interface QueuedIntake {
+  campaignId: number;
+  queued: QueuedTopic[];
+}
+
 /**
  * Phase 1 of intake: persist one `picked` topic per target platform and return
  * immediately, WITHOUT generating anything.
@@ -71,7 +76,7 @@ export interface QueuedTopic {
  * request with its own budget (POST /api/topics/generate), in parallel, with
  * the drain cron sweeping up anything that never got picked up.
  */
-export async function queueManualIntake(raw: unknown): Promise<QueuedTopic[]> {
+export async function queueManualIntake(raw: unknown): Promise<QueuedIntake> {
   const input = manualIntakeSchema.parse(raw);
   const targetPlatforms = input.platforms?.length ? input.platforms : [input.platform ?? "linkedin"];
 
@@ -80,6 +85,19 @@ export async function queueManualIntake(raw: unknown): Promise<QueuedTopic[]> {
     const p = await pillars.findByName(input.brand_id, input.pillar);
     pillarId = p?.id ?? null;
   }
+
+  // One idea, however many channels it goes out on (migration 015) — the
+  // topics below are its per-channel jobs, not five unrelated ideas.
+  const campaign = await campaigns.create({
+    brand_id: input.brand_id,
+    title: input.topic,
+    pillar_id: pillarId,
+    source: "manual",
+    why_now: input.why_now ?? "operator-seeded",
+    must_say: input.must_say ?? null,
+    source_asset_id: input.source_asset_id ?? null,
+    created_by: "manual-intake",
+  });
 
   const queued: QueuedTopic[] = [];
   for (const platform of targetPlatforms) {
@@ -96,16 +114,17 @@ export async function queueManualIntake(raw: unknown): Promise<QueuedTopic[]> {
       platform_extra: input.platformDetails?.[platform] ?? null,
       priority: 10, // outrank AI-suggested topics (§4.2)
       status: "picked",
+      campaign_id: campaign.id,
     });
 
     logger.info(
-      { topicId: topic.id, brandId: input.brand_id, platform },
+      { topicId: topic.id, campaignId: campaign.id, brandId: input.brand_id, platform },
       "WF-3: manual topic queued (priority)",
     );
     queued.push({ platform, topicId: topic.id });
   }
 
-  return queued;
+  return { campaignId: campaign.id, queued };
 }
 
 /**
@@ -115,7 +134,7 @@ export async function queueManualIntake(raw: unknown): Promise<QueuedTopic[]> {
  * generate each topic separately instead.
  */
 export async function handleManualIntake(raw: unknown): Promise<ManualIntakeResult[]> {
-  const queued = await queueManualIntake(raw);
+  const { queued } = await queueManualIntake(raw);
   const results: ManualIntakeResult[] = [];
   for (const q of queued) {
     results.push({ ...q, draft: await runRepurposeReview(q.topicId) });

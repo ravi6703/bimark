@@ -3,8 +3,8 @@ import { logger } from "../logger.js";
 import { DEFAULT_VOICE_GUIDE } from "../agents/prompts.js";
 import { brands, channels, pillars } from "./repositories/index.js";
 import { ingestDocument, type SourceDocument } from "../rag/ingest.js";
-import { closePool } from "./pool.js";
-import { migrate } from "./migrate.js";
+import { closePool, withAdvisoryLock } from "./pool.js";
+import { migrate, SEED_LOCK_KEY } from "./migrate.js";
 
 /**
  * Seed the MVP with Board Infinity: brand + voice guide, a proposed starting set
@@ -219,6 +219,13 @@ Litmus test: would an academic dean read this and think "this team will
 export async function seed(): Promise<void> {
   if (!config.db.enabled) throw new Error("DATABASE_URL not set — cannot seed.");
   await migrate();
+  // Idempotent, but only one caller at a time: every step below is a
+  // "does it exist? no — create it" pair, which two concurrent seeds both
+  // answer 'no' to before either writes.
+  await withAdvisoryLock(SEED_LOCK_KEY, seedInner);
+}
+
+async function seedInner(): Promise<void> {
 
   let brand = await brands.getByName("Board Infinity");
   if (!brand) {

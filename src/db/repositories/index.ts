@@ -764,6 +764,23 @@ export const posts = {
     );
     return Number(rows[0]?.n ?? 0);
   },
+  /**
+   * Published counts per platform since `since` — what the morning pitch needs
+   * to tell which channel is furthest behind its channel_configs.weekly_target.
+   * Platforms with nothing published simply don't appear; callers default to 0.
+   */
+  async countPublishedSinceByPlatform(brandId: number, since: Date): Promise<Record<string, number>> {
+    const { rows } = await query<{ platform: string; n: number }>(
+      `SELECT po.platform, count(*)::int AS n
+         FROM posts po
+         JOIN drafts d ON d.id = po.draft_id
+         JOIN topics t ON t.id = d.topic_id
+        WHERE t.brand_id = $1 AND po.published_at >= $2
+        GROUP BY po.platform`,
+      [brandId, since],
+    );
+    return Object.fromEntries(rows.map((r) => [r.platform, Number(r.n)]));
+  },
   /** Calendar view (audit Phase 2) — scheduled + published posts, joined for display. */
   async listWithContext(
     brandId: number,

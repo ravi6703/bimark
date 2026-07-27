@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
-import { closePool, getPool } from "./pool.js";
+import { closePool, getPool, withAdvisoryLock } from "./pool.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, "..", "..", "db", "migrations");
@@ -13,6 +13,8 @@ const MIGRATIONS_DIR = join(__dirname, "..", "..", "db", "migrations");
  * calls. Any value works as long as nothing else in the database uses it.
  */
 const MIGRATION_LOCK_KEY = 4_815_162_342;
+/** Distinct key so seeding and migrating don't block each other needlessly. */
+export const SEED_LOCK_KEY = 4_815_162_343;
 
 /**
  * Minimal forward-only migration runner. Applies every *.sql file in
@@ -30,17 +32,7 @@ export async function migrate(): Promise<string[]> {
   if (!config.db.enabled) {
     throw new Error("DATABASE_URL is not set — cannot migrate.");
   }
-  const pool = getPool();
-  const lock = await pool.connect();
-  try {
-    await lock.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
-    return await applyPending();
-  } finally {
-    await lock
-      .query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY])
-      .catch((err) => logger.warn({ err }, "failed to release migration lock"));
-    lock.release();
-  }
+  return withAdvisoryLock(MIGRATION_LOCK_KEY, applyPending);
 }
 
 async function applyPending(): Promise<string[]> {
