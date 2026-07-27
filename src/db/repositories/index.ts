@@ -1,6 +1,8 @@
 import type {
   ApprovalEntry,
   Brand,
+  Campaign,
+  CampaignWithChannels,
   ChannelConfig,
   CompetitorNote,
   Draft,
@@ -288,6 +290,83 @@ export function toVector(v: number[]): string {
   return `[${v.join(",")}]`;
 }
 
+// ── Campaigns (the idea above the per-channel topics — migration 015) ────────
+export const campaigns = {
+  async get(id: number, brandId: number): Promise<Campaign | null> {
+    const { rows } = await query<Campaign>(
+      "SELECT * FROM campaigns WHERE id = $1 AND brand_id = $2",
+      [id, brandId],
+    );
+    return rows[0] ?? null;
+  },
+  async create(c: {
+    brand_id: number;
+    title: string;
+    pillar_id?: number | null;
+    source?: string | null;
+    why_now?: string | null;
+    must_say?: string | null;
+    source_asset_id?: number | null;
+    created_by?: string | null;
+  }): Promise<Campaign> {
+    const { rows } = await query<Campaign>(
+      `INSERT INTO campaigns
+         (brand_id, title, pillar_id, source, why_now, must_say, source_asset_id, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [
+        c.brand_id,
+        c.title,
+        c.pillar_id ?? null,
+        c.source ?? null,
+        c.why_now ?? null,
+        c.must_say ?? null,
+        c.source_asset_id ?? null,
+        c.created_by ?? null,
+      ],
+    );
+    return rows[0]!;
+  },
+  /**
+   * Campaigns with each channel's live state — the query behind a Campaigns
+   * view, where one idea is one card listing the platforms it went out on and
+   * where each of those stands. One round trip rather than N+1: the channels
+   * are aggregated in SQL and returned as JSON.
+   *
+   * A topic has at most one draft in practice, but the join takes the most
+   * recent by id so a re-drafted topic reports its current one rather than
+   * duplicating the channel row.
+   */
+  async listWithChannels(brandId: number, limit = 50): Promise<CampaignWithChannels[]> {
+    const { rows } = await query<CampaignWithChannels>(
+      `SELECT c.*,
+              COALESCE(
+                (SELECT json_agg(ch ORDER BY ch.platform)
+                   FROM (
+                     SELECT t.id                AS "topicId",
+                            t.platform          AS platform,
+                            t.status            AS status,
+                            d.id                AS "draftId",
+                            d.status            AS "draftStatus"
+                       FROM topics t
+                       LEFT JOIN LATERAL (
+                         SELECT id, status FROM drafts
+                          WHERE topic_id = t.id
+                          ORDER BY id DESC LIMIT 1
+                       ) d ON true
+                      WHERE t.campaign_id = c.id
+                   ) ch),
+                '[]'::json
+              ) AS channels
+         FROM campaigns c
+        WHERE c.brand_id = $1
+        ORDER BY c.created_at DESC
+        LIMIT $2`,
+      [brandId, limit],
+    );
+    return rows;
+  },
+};
+
 // ── Topics ────────────────────────────────────────────────────────────────────
 export const topics = {
   async get(id: number): Promise<Topic | null> {
@@ -308,12 +387,15 @@ export const topics = {
     priority?: number;
     status?: TopicStatus;
     pitch_group?: string | null;
+    /** The idea this channel job belongs to (migration 015). Optional while
+     * the writers are being migrated over — NULL just means "not grouped". */
+    campaign_id?: number | null;
   }): Promise<Topic> {
     const { rows } = await query<Topic>(
       `INSERT INTO topics
          (brand_id, source, pillar_id, angle, why_now, source_asset_id, platform,
-          format_hint, must_say, platform_extra, priority, status, pitch_group)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+          format_hint, must_say, platform_extra, priority, status, pitch_group, campaign_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [
         t.brand_id,
         t.source,
@@ -328,6 +410,7 @@ export const topics = {
         t.priority ?? 0,
         t.status ?? "suggested",
         t.pitch_group ?? null,
+        t.campaign_id ?? null,
       ],
     );
     return rows[0]!;

@@ -127,7 +127,39 @@ export interface Topic {
   priority: number;
   status: TopicStatus;
   pitch_group: string | null;
+  /** The idea this per-channel job belongs to (migration 015). NULL only for
+   * rows predating the campaign entity that the backfill couldn't group. */
+  campaign_id: number | null;
   created_at: Date;
+}
+
+/**
+ * One content idea, spanning however many channels it's published to
+ * (migration 015). A `topics` row is one channel's job within a campaign —
+ * the idea-level fields live here, the per-channel ones stay on the topic.
+ */
+export interface Campaign {
+  id: number;
+  brand_id: number;
+  title: string;
+  pillar_id: number | null;
+  source: TopicSource | null;
+  why_now: string | null;
+  must_say: string | null;
+  source_asset_id: number | null;
+  created_by: string | null;
+  created_at: Date;
+}
+
+/** A campaign plus the per-channel state of each of its topics. */
+export interface CampaignWithChannels extends Campaign {
+  channels: {
+    topicId: number;
+    platform: string;
+    status: TopicStatus;
+    draftId: number | null;
+    draftStatus: DraftStatus | null;
+  }[];
 }
 
 export interface ReviewerResult {
