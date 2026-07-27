@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type ClarifyQuestion, type Pillar, type PlatformDetails } from "../api";
 import { PLATFORMS as PLATFORM_UI } from "../platforms";
+import { ReadinessBanner, useReadiness } from "./ReadinessPanel";
 
 // The picker uses the longer disambiguating labels; the tab/badge form of
 // the same channels lives alongside them in src/platforms.ts.
@@ -11,6 +12,7 @@ export function NewTopicForm() {
   const [topic, setTopic] = useState("");
   const [pillar, setPillar] = useState("");
   const [platforms, setPlatforms] = useState<string[]>(["linkedin"]);
+  const readiness = useReadiness();
   const [mustSay, setMustSay] = useState("");
   const [whyNow, setWhyNow] = useState("");
 
@@ -264,6 +266,11 @@ export function NewTopicForm() {
 
   return (
     <form className="card" onSubmit={handleSubmit}>
+      {/* Move 6 — a brand with no owned material produces ungrounded drafts by
+          construction. Saying so here, before the work, is the whole point;
+          the per-draft low_source warning only ever arrived after the
+          generation had already been paid for and read. */}
+      <ReadinessBanner readiness={readiness} />
       <label>Platforms — check all that should get a draft, then tap one to customize it</label>
       <div className="checkbox-row">
         {PLATFORMS.map((p) => (

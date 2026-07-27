@@ -112,6 +112,10 @@ export interface Pillar {
   name: string;
   description: string | null;
   active: boolean;
+  /** What this pillar is FOR (Move 4). 'authority' posts never carry a call to
+   * action; 'conversion' posts offer exactly one, plainly, at the end. */
+  intent: "authority" | "conversion";
+  conversion_target: string | null;
 }
 export interface Brand {
   id: number;
@@ -322,6 +326,107 @@ export interface RedditOpportunity {
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────
+
+// ── Results & measurement (Moves 1, 2, 5, 6) ───────────────────────────────
+export interface CadenceLine {
+  platform: string;
+  published: number;
+  target: number | null;
+}
+export type ScoreboardHours =
+  | { configured: false; reason: string }
+  | {
+      configured: true;
+      postsCounted: number;
+      minutesPerPostBefore: number;
+      minutesPerPostAfter: number;
+      hoursSaved: number;
+      capturedAt: string;
+      estimateBased: true;
+    };
+export interface Scoreboard {
+  weekStart: string;
+  cadence: { published: number; target: number | null; byPlatform: CadenceLine[] };
+  queue: {
+    firstPassApprovalRate: number | null;
+    medianHoursToDecision: number | null;
+    awaitingReview: number;
+    sample: number;
+  };
+  hours: ScoreboardHours;
+  inbound: {
+    leads: number;
+    signups: number;
+    entries: number;
+    attributablePosts: number;
+    totalPosts: number;
+  };
+}
+export interface Outcome {
+  id: number;
+  post_id: number | null;
+  period_start: string;
+  leads: number;
+  signups: number;
+  source: string;
+  note: string | null;
+  recorded_by: string;
+  created_at: string;
+}
+export interface TimeBaseline {
+  id: number;
+  minutes_per_post_before: number;
+  minutes_per_post_after: number;
+  note: string | null;
+  recorded_by: string;
+  captured_at: string;
+}
+export interface ReadinessCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  fix: string | null;
+  blocking: boolean;
+}
+export interface BrandReadiness {
+  brandId: number;
+  level: "ready" | "partial" | "empty";
+  passed: number;
+  total: number;
+  checks: ReadinessCheck[];
+  blockingReason: string | null;
+}
+export interface PromptVersionStats {
+  promptVersion: string;
+  decided: number;
+  firstPassApprovalRate: number;
+  rejectRate: number;
+  meanEditDistance: number | null;
+  flagRate: number;
+  repetitiveRate: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+export interface EvalCaseSummary {
+  id: number;
+  platform: string;
+  angle: string | null;
+  prompt_version: string | null;
+  edit_distance: number | null;
+  added_by: string;
+  created_at: string;
+}
+export interface EvalRun {
+  id: number;
+  prompt_version: string;
+  cases_run: number;
+  mean_similarity: number | null;
+  mean_edit_distance: number | null;
+  ran_by: string;
+  ran_at: string;
+}
+
 export const api = {
   async login(name: string, password: string): Promise<string> {
     const { token } = await request<{ token: string }>("/auth/login", {
@@ -373,7 +478,13 @@ export const api = {
 
   async updatePillar(
     id: number,
-    input: { name?: string; description?: string; active?: boolean },
+    input: {
+      name?: string;
+      description?: string;
+      active?: boolean;
+      intent?: "authority" | "conversion";
+      conversion_target?: string | null;
+    },
   ): Promise<Pillar> {
     const { pillar } = await request<{ pillar: Pillar }>(`/pillars/${id}`, {
       method: "PATCH",
@@ -708,6 +819,81 @@ export const api = {
       { method: "POST" },
     );
     return opportunity;
+  },
+
+  // ── Results & measurement (Moves 1, 2, 5, 6) ─────────────────────────────
+  async getScoreboard(): Promise<Scoreboard> {
+    const { scoreboard } = await request<{ scoreboard: Scoreboard }>("/scoreboard");
+    return scoreboard;
+  },
+
+  async listOutcomes(): Promise<Outcome[]> {
+    const { outcomes } = await request<{ outcomes: Outcome[] }>("/outcomes");
+    return outcomes;
+  },
+
+  async recordOutcome(input: {
+    leads: number;
+    signups?: number;
+    period_start?: string;
+    source?: string;
+    note?: string;
+  }): Promise<Outcome> {
+    const { outcome } = await request<{ outcome: Outcome }>("/outcomes", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return outcome;
+  },
+
+  async deleteOutcome(id: number): Promise<void> {
+    await request(`/outcomes/${id}`, { method: "DELETE" });
+  },
+
+  async getTimeBaseline(): Promise<TimeBaseline | null> {
+    const { baseline } = await request<{ baseline: TimeBaseline | null }>("/time-baseline");
+    return baseline;
+  },
+
+  async recordTimeBaseline(input: {
+    minutes_per_post_before: number;
+    minutes_per_post_after: number;
+    note?: string;
+  }): Promise<TimeBaseline> {
+    const { baseline } = await request<{ baseline: TimeBaseline }>("/time-baseline", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return baseline;
+  },
+
+  async getReadiness(): Promise<BrandReadiness> {
+    const { readiness } = await request<{ readiness: BrandReadiness }>("/brands/readiness");
+    return readiness;
+  },
+
+  async getAllReadiness(): Promise<BrandReadiness[]> {
+    const { readiness } = await request<{ readiness: BrandReadiness[] }>(
+      "/brands/readiness?all=true",
+    );
+    return readiness;
+  },
+
+  async getEval(): Promise<{
+    currentPromptVersion: string;
+    report: PromptVersionStats[];
+    cases: EvalCaseSummary[];
+    runs: EvalRun[];
+  }> {
+    return request("/eval");
+  },
+
+  async harvestEvalCases(): Promise<{ added: number; skipped: number }> {
+    return request("/eval/harvest", { method: "POST" });
+  },
+
+  async runEval(): Promise<{ run: EvalRun; remaining: number }> {
+    return request("/eval/run", { method: "POST" });
   },
 
   async clarifyTopic(input: {

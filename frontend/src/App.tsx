@@ -10,6 +10,8 @@ import { TeamView } from "./components/TeamView";
 import { CampaignsView } from "./components/CampaignsView";
 import { ChannelsView } from "./components/ChannelsView";
 import { InsightsView } from "./components/InsightsView";
+import { ResultsView } from "./components/ResultsView";
+import { PromptQualityView } from "./components/PromptQualityView";
 import { CalendarView } from "./components/CalendarView";
 import { CompetitorsView } from "./components/CompetitorsView";
 import { TodayView } from "./components/TodayView";
@@ -38,6 +40,14 @@ const TABS = [
     icon: "🏠",
     title: "Today",
     subtitle: "What the agents found, what's waiting on you, and where the brand stands.",
+  },
+  {
+    key: "results",
+    label: "Results",
+    icon: "🎯",
+    title: "Results",
+    subtitle:
+      "Cadence, queue health, hours saved, and inbound — the four numbers this is judged on.",
   },
   {
     key: "queue",
@@ -130,6 +140,14 @@ const TABS = [
     icon: "📊",
     title: "Metrics",
     subtitle: "Draft quality trends over time.",
+    group: "Growth intelligence",
+  },
+  {
+    key: "prompts",
+    label: "Prompt quality",
+    icon: "🔬",
+    title: "Prompt quality",
+    subtitle: "Whether prompt changes actually helped — measured, not argued.",
     group: "Growth intelligence",
   },
   {
@@ -360,7 +378,9 @@ export function App() {
         {tab === "seo" && <SeoAuditView />}
         {tab === "reddit" && <RedditView />}
         {tab === "pillars" && <PillarsView />}
+        {tab === "results" && <ResultsView />}
         {tab === "metrics" && <MetricsView />}
+        {tab === "prompts" && <PromptQualityView />}
         {tab === "team" && <TeamView />}
       </main>
     </div>

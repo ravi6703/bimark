@@ -108,6 +108,42 @@ important switches:
 | `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` | The approval gate (§9). Unset ⇒ dry-run logs. |
 | `RAG_SIMILARITY_THRESHOLD` | Below this, drafts are flagged `low_source` instead of inventing claims (§4.2). |
 
+## What "working" means
+
+The product measures the thing it is judged on, not just the thing it produces.
+Four numbers, on the **Results** screen:
+
+| Number | How it's derived |
+| --- | --- |
+| Posts published vs. weekly target | Measured, per channel |
+| First-pass approval rate + median time to decision | Measured, from the approvals log |
+| Hours saved | Real published count × the team's **own** before/after estimate |
+| Leads & signups | Recorded by a human, shown next to how much of what published is attributable at all |
+
+Two deliberate constraints keep it honest:
+
+- **Nothing is estimated on the platform's behalf.** A number that isn't set up
+  reports `not configured` with the reason, never a plausible-looking zero.
+  Rates stay blank on an empty sample rather than reporting 0%.
+- **Attribution is only claimed where it exists.** Publishing UTM-stamps links
+  to the brand's *own* domain only; a third-party URL the reviewer approved is
+  never rewritten, and a post with no stampable link records no campaign rather
+  than counting as a zero-lead post.
+
+### On edit distance
+
+A large human edit is not an AI failure. LinkedIn demotes content it detects as
+AI-generated, so the reviewer's edit is what makes a post work — the surfaces
+that show this metric say so, and the LinkedIn prompt deliberately produces a
+strong draft that wants a human line rather than a finished post.
+
+### Pillar intent
+
+Generation optimises for credibility over lead-gen. That's right for most
+pillars and wrong for the ones that exist to convert, so each pillar carries an
+intent: `authority` (the default, no call to action, byte-identical to the
+original behaviour) or `conversion` (exactly one plain next step, at the end).
+
 ## Open decisions from the PRD (§12)
 
 The PRD leaves five decisions open; the seeded defaults here are **proposals**,
@@ -133,7 +169,11 @@ src/rag/             chunk, embed (mock/openai/voyage), ingest (hash-skip), retr
 src/agents/          §17 prompts + Daily Pitch, Repurposing, Reviewer, Trend Monitor, Memo
 src/telegram/        approval-gate client + message/callback encoding
 src/publish/         Buffer / Ayrshare / mock adapters (§8)
-src/workflows/       WF-1 … WF-7 (§16)
+src/workflows/       WF-1 … WF-10 (§16)
+src/platforms/       the channel registry — one place a platform is defined
+src/scoreboard/      the four numbers the product is judged on (Move 2)
+src/eval/            prompt-quality report + golden-set replay harness (Move 5)
+src/brand/           per-brand readiness — is this brand set up to draft? (Move 6)
 src/server.ts        Express app (Docker/VM): manual-intake + telegram webhooks, /health, /metrics/quality
 src/scheduler.ts     node-cron for WF-1/6/7 + nightly ingest refresh (Docker/VM only)
 api/                 Vercel serverless functions — same routes/cron jobs, see docs/VERCEL.md

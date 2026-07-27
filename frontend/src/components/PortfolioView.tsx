@@ -1,9 +1,24 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, type Brand } from "../api";
+import { api, ApiError, type Brand, type BrandReadiness } from "../api";
 
 interface BrandRow extends Brand {
   summary: Awaited<ReturnType<typeof api.getBrandSummary>> | null;
   summaryError: boolean;
+}
+
+/** Move 6 — a brand with no source material isn't comparable to one with a
+ * history, and listing them identically implies a parity that doesn't exist. */
+function ReadinessBadge({ readiness }: { readiness: BrandReadiness | undefined }) {
+  if (!readiness) return null;
+  if (readiness.level === "ready") return <span className="badge badge-good">set up</span>;
+  if (readiness.level === "empty") {
+    return <span className="badge badge-warn">no source material</span>;
+  }
+  return (
+    <span className="badge">
+      {readiness.passed}/{readiness.total} set up
+    </span>
+  );
 }
 
 /**
@@ -16,6 +31,7 @@ interface BrandRow extends Brand {
  */
 export function PortfolioView({ onOpenBrand }: { onOpenBrand: (slug: string) => void }) {
   const [rows, setRows] = useState<BrandRow[] | null>(null);
+  const [readiness, setReadiness] = useState<Record<number, BrandReadiness>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +52,14 @@ export function PortfolioView({ onOpenBrand }: { onOpenBrand: (slug: string) => 
         if (!cancelled) setRows(withSummaries);
       })
       .catch((err) => !cancelled && setError(err instanceof ApiError ? err.message : "Failed to load portfolio"));
+    // Readiness is advisory: if it fails, the portfolio still renders its
+    // numbers rather than showing an error for a supplementary signal.
+    api
+      .getAllReadiness()
+      .then((all) => {
+        if (!cancelled) setReadiness(Object.fromEntries(all.map((r) => [r.brandId, r])));
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -55,11 +79,15 @@ export function PortfolioView({ onOpenBrand }: { onOpenBrand: (slug: string) => 
         <div className="card" key={b.slug}>
           <div className="card-head">
             <strong>{b.name}</strong>
+            <ReadinessBadge readiness={readiness[b.id]} />
             <button className="btn" style={{ marginLeft: "auto" }} onClick={() => onOpenBrand(b.slug)}>
               Open →
             </button>
           </div>
           {b.summaryError && <div className="error-box">Couldn't load this brand's numbers.</div>}
+          {readiness[b.id]?.blockingReason && (
+            <div className="readiness-banner">{readiness[b.id]!.blockingReason}</div>
+          )}
           {b.summary && (
             <div className="portfolio-stat-row">
               <div className="portfolio-stat">

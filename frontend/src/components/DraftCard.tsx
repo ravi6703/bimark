@@ -285,6 +285,15 @@ export function DraftCard({ draft, onChanged }: { draft: Draft; onChanged: () =>
       {draft.reviewer_result?.verdict === "flag" && (
         <div className="meta-note flag">
           🚩 Reviewer flagged (escalated): {draft.reviewer_result.notes}
+          {/* Which rule actually fired, not just the prose summary — a flag you
+              can't trace to a rule isn't actionable, it's just discouraging. */}
+          {draft.reviewer_result.flags.length > 0 && (
+            <ul className="flag-rules">
+              {draft.reviewer_result.flags.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       {draft.repetitive && (

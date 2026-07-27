@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { api, ApiError, type Brand, type Pillar } from "../api";
 import { OnboardingPanel } from "./OnboardingPanel";
+import { ReadinessPanel } from "./ReadinessPanel";
 
 function BrandEditor({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => void }) {
   const [voiceGuide, setVoiceGuide] = useState(brand.voice_guide ?? "");
@@ -303,6 +304,93 @@ function PillarRow({ pillar, onSaved }: { pillar: Pillar; onSaved: (p: Pillar) =
       ) : (
         pillar.description && <div className="pillar-tag">{pillar.description}</div>
       )}
+      <IntentControl pillar={pillar} onSaved={onSaved} />
+      {error && <div className="error-box" style={{ marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+}
+
+/**
+ * Move 4 — what this pillar is FOR.
+ *
+ * Generation optimises for credibility over lead-gen, which is right for most
+ * pillars and wrong for the ones that exist to convert. Rather than the whole
+ * product picking one answer, each pillar says which trade it's making.
+ * 'authority' is the default and reproduces the original behaviour exactly.
+ */
+function IntentControl({
+  pillar,
+  onSaved,
+}: {
+  pillar: Pillar;
+  onSaved: (p: Pillar) => void;
+}) {
+  const [target, setTarget] = useState(pillar.conversion_target ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function setIntent(intent: "authority" | "conversion") {
+    setSaving(true);
+    setError(null);
+    try {
+      onSaved(
+        await api.updatePillar(pillar.id, {
+          intent,
+          // Switching to authority clears the offer server-side too, so a
+          // retired call to action can't keep leaking into generated copy.
+          conversion_target: intent === "authority" ? null : target.trim() || null,
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not change intent");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div className="row" style={{ gap: 6, alignItems: "center" }}>
+        <span className="subtle">Posts on this pillar:</span>
+        <button
+          type="button"
+          className={`btn${pillar.intent === "authority" ? " primary" : ""}`}
+          onClick={() => setIntent("authority")}
+          disabled={saving || pillar.intent === "authority"}
+          aria-pressed={pillar.intent === "authority"}
+        >
+          Build authority
+        </button>
+        <button
+          type="button"
+          className={`btn${pillar.intent === "conversion" ? " primary" : ""}`}
+          onClick={() => setIntent("conversion")}
+          disabled={saving || pillar.intent === "conversion"}
+          aria-pressed={pillar.intent === "conversion"}
+        >
+          Earn a next step
+        </button>
+      </div>
+      {pillar.intent === "conversion" ? (
+        <div style={{ marginTop: 8 }}>
+          <input
+            type="text"
+            value={target}
+            placeholder="the one next step to offer, e.g. the placement programme page"
+            onChange={(e) => setTarget(e.target.value)}
+            onBlur={() => {
+              if (target.trim() !== (pillar.conversion_target ?? "")) void setIntent("conversion");
+            }}
+            style={{ width: "100%", maxWidth: 460 }}
+          />
+          <p className="subtle">
+            Offered once, at the end, in a plain sentence. Credibility still comes first — the post
+            has to stand on its own insight even if nobody clicks.
+          </p>
+        </div>
+      ) : (
+        <p className="subtle">No call to action. This is the default and suits most pillars.</p>
+      )}
       {error && <div className="error-box" style={{ marginTop: 8 }}>{error}</div>}
     </div>
   );
@@ -369,6 +457,9 @@ export function PillarsView() {
 
   return (
     <div>
+      {/* Move 6 — the full checklist lives here, next to the settings that
+          resolve it, so a failing check is one scroll from its fix. */}
+      <ReadinessPanel />
       <OnboardingPanel onApplied={load} />
       {brand && <BrandEditor brand={brand} onSaved={setBrand} />}
       {brand && <BrandLogoUploader brand={brand} onChanged={load} />}

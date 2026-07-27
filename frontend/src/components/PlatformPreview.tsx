@@ -31,6 +31,8 @@ function handleize(name: string) {
 const LI_TRUNCATE = 210;
 /** Instagram truncates a caption to roughly this many characters before "more". */
 const IG_TRUNCATE = 125;
+/** X's hard character ceiling — exceeding it is a publish failure, not a nit. */
+const X_LIMIT = 280;
 
 function ExpandableText({ text, limit, className }: { text: string; limit: number; className?: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -75,7 +77,15 @@ export function PlatformPreview({
           </div>
         </div>
         <p className="pv-body pv-x-body">{body}</p>
+        {/* X's limit is a hard publish failure, not a style note — the
+            reviewer needs to see the headroom before approving, not find out
+            when the post is rejected. */}
+        <div className={`pv-x-count${body.length > X_LIMIT ? " over" : ""}`}>
+          {body.length}/{X_LIMIT}
+          {body.length > X_LIMIT && ` — ${body.length - X_LIMIT} over, this will be rejected`}
+        </div>
         <div className="pv-actions pv-x-actions">
+
           <span><Icon d={ICONS.comment} /> 0</span>
           <span><Icon d={ICONS.repost} /> 0</span>
           <span><Icon d={ICONS.heart} /> 0</span>
