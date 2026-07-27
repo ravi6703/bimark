@@ -1032,6 +1032,28 @@ input[type="radio"] {
   margin-top: 4px;
 }
 
+/* Campaign channels — one chip per platform the idea went out on, so a
+   card reads as "this idea, across these channels" at a glance. */
+.campaign-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.campaign-channel {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+.campaign-channel b {
+  text-transform: capitalize;
+}
+
 /* Portfolio rollup — compact per-brand stat row, denser than the full
    StatTile grid since this repeats once per brand on one page. */
 .portfolio-stat-row {

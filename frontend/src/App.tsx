@@ -7,7 +7,7 @@ import { NewTopicForm } from "./components/NewTopicForm";
 import { PillarsView } from "./components/PillarsView";
 import { MetricsView } from "./components/MetricsView";
 import { TeamView } from "./components/TeamView";
-import { TopicsView } from "./components/TopicsView";
+import { CampaignsView } from "./components/CampaignsView";
 import { InsightsView } from "./components/InsightsView";
 import { CalendarView } from "./components/CalendarView";
 import { CompetitorsView } from "./components/CompetitorsView";
@@ -68,11 +68,11 @@ const TABS = [
     hidden: true,
   },
   {
-    key: "topics",
-    label: "Topics",
+    key: "campaigns",
+    label: "Campaigns",
     icon: "💡",
-    title: "Topics",
-    subtitle: "Every topic the pipeline has suggested or been given, AI and manual alike.",
+    title: "Campaigns",
+    subtitle: "One card per idea, with every channel it goes out on and where each one stands.",
     group: "Workspace",
   },
   {
@@ -343,7 +343,7 @@ export function App() {
         {tab === "queue" && <DraftQueue onDraftsChanged={refreshPendingCount} />}
         {tab === "calendar" && <CalendarView />}
         {tab === "new" && <NewTopicForm />}
-        {tab === "topics" && <TopicsView />}
+        {tab === "campaigns" && <CampaignsView onNavigate={(k) => goTo(k as TabKey)} />}
         {tab === "insights" && <InsightsView />}
         {tab === "competitors" && <CompetitorsView />}
         {tab === "geo" && <GeoVisibilityView />}
