@@ -467,6 +467,12 @@ export const api = {
     });
   },
 
+  /**
+   * Queues one topic per selected platform and returns straight away — this
+   * does NOT wait for drafts. Generating every platform in one request used to
+   * blow past the 60s serverless cap; call generateDraft() per returned topic
+   * instead (they can run in parallel).
+   */
   async createTopic(input: {
     topic: string;
     pillar?: string;
@@ -475,14 +481,21 @@ export const api = {
     must_say?: string;
     why_now?: string;
     platformDetails?: PlatformDetails;
-  }): Promise<{ platform: string; topicId: number; draftId: number }[]> {
-    const { results } = await request<{
-      results: { platform: string; topicId: number; draftId: number }[];
-    }>("/webhooks/manual-intake", {
+  }): Promise<{ platform: string; topicId: number }[]> {
+    const { queued } = await request<{ queued: { platform: string; topicId: number }[] }>(
+      "/webhooks/manual-intake",
+      { method: "POST", body: JSON.stringify({ brand_id: 1, ...input }) },
+    );
+    return queued;
+  },
+
+  /** Generate the draft for one queued topic. Safe to retry — a failed
+   * generation releases the topic back to the queue. */
+  async generateDraft(topicId: number): Promise<{ platform: string; draftId: number }> {
+    return request("/topics/generate", {
       method: "POST",
-      body: JSON.stringify({ brand_id: 1, ...input }),
+      body: JSON.stringify({ topicId }),
     });
-    return results;
   },
 
   /** Recent angles already covered for this pillar+platform (Okara-inspired follow-up). */

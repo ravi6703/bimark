@@ -30,17 +30,41 @@ import type {
  *   retrieve owned material → draft → brand-safety review (loop on flag) →
  *   persist draft → Telegram approval preview.
  */
-export async function runRepurposeReview(topicId: number): Promise<Draft> {
-  const topic = await topics.get(topicId);
-  if (!topic) throw new Error(`WF-4: topic ${topicId} not found`);
+export class TopicAlreadyGeneratingError extends Error {
+  constructor(topicId: number) {
+    super(`Topic ${topicId} is already being generated`);
+    this.name = "TopicAlreadyGeneratingError";
+  }
+}
 
+export async function runRepurposeReview(topicId: number): Promise<Draft> {
+  const existing = await topics.get(topicId);
+  if (!existing) throw new Error(`WF-4: topic ${topicId} not found`);
+
+  // Claim it before doing any expensive work — see topics.claimForDrafting.
+  const topic = await topics.claimForDrafting(topicId);
+  if (!topic) throw new TopicAlreadyGeneratingError(topicId);
+
+  try {
+    return await generateForClaimedTopic(topic);
+  } catch (err) {
+    // Hand the topic back to the queue so the drain cron (or a retry from the
+    // dashboard) can pick it up again — otherwise a mid-generation failure
+    // strands it in `drafting` forever with no draft to show for it.
+    await topics.setStatus(topicId, "picked").catch((resetErr) => {
+      logger.error({ err: resetErr, topicId }, "WF-4: failed to release topic back to the queue");
+    });
+    throw err;
+  }
+}
+
+async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
+  const topicId = topic.id;
   const brand = await brands.get(topic.brand_id);
   const voiceGuide = brand?.voice_guide ?? DEFAULT_VOICE_GUIDE;
   const bannedTopics = brand?.banned_topics ?? [];
   const pillarName = await resolvePillarName(topic);
   const platform = normalizePlatform(topic.platform);
-
-  await topics.setStatus(topic.id, "drafting");
 
   // Step 1 — gather grounding chunks (§16 WF-4.1).
   const { chunks, lowSource } = await gatherChunks(topic);

@@ -8,7 +8,8 @@ import { retrieve } from "../src/rag/retrieve.js";
 import { ingestDocument } from "../src/rag/ingest.js";
 import { runMorningPitch } from "../src/workflows/wf1_morningPitch.js";
 import { handlePitchCallback } from "../src/workflows/wf2_pitchCallback.js";
-import { handleManualIntake } from "../src/workflows/wf3_manualIntake.js";
+import { handleManualIntake, queueManualIntake } from "../src/workflows/wf3_manualIntake.js";
+import { runRepurposeReview, TopicAlreadyGeneratingError } from "../src/workflows/wf4_repurposeReview.js";
 import { finalizeDraft } from "../src/workflows/wf5_approvalCallback.js";
 import { runAnalyticsPoller } from "../src/workflows/wf6_analyticsPoller.js";
 import { runEditorialMemo, runSovSnapshot } from "../src/workflows/wf7_sovMemo.js";
@@ -111,6 +112,50 @@ d("end-to-end pipeline (§16 WF-1..WF-7)", () => {
     }
     const xDraft = results.find((r) => r.platform === "x")!.draft;
     expect(xDraft.body!.length).toBeLessThanOrEqual(280);
+  });
+
+  it("WF-3 async intake: queueing does not generate, and each topic generates separately", async () => {
+    const queued = await queueManualIntake({
+      brand_id: brandId,
+      topic: "What hiring managers actually check in a campus assessment",
+      pillar: "Applied assessment",
+      platforms: ["linkedin", "x", "geo"],
+    });
+    expect(queued).toHaveLength(3);
+
+    // Nothing generated yet — that's the whole point: the request returns
+    // before any LLM work happens, so N platforms can't blow the time budget.
+    for (const q of queued) {
+      const t = await topics.get(q.topicId);
+      expect(t!.status).toBe("picked");
+      const { rows } = await query("SELECT count(*)::int AS n FROM drafts WHERE topic_id = $1", [
+        q.topicId,
+      ]);
+      expect((rows[0] as { n: number }).n).toBe(0);
+    }
+
+    // Each queued topic then generates under its own request.
+    for (const q of queued) {
+      const draft = await runRepurposeReview(q.topicId);
+      expect(draft.platform).toBe(q.platform);
+      expect(draft.status).toBe("pending_approval");
+      expect((await topics.get(q.topicId))!.status).toBe("drafted");
+    }
+  });
+
+  it("WF-4: a topic already being generated can't be claimed twice", async () => {
+    const [queued] = await queueManualIntake({
+      brand_id: brandId,
+      topic: "Why structured interviews beat gut feel",
+      pillar: "Applied assessment",
+      platforms: ["linkedin"],
+    });
+
+    // First claim wins and drafts; the second finds nothing left in `picked`.
+    await runRepurposeReview(queued!.topicId);
+    await expect(runRepurposeReview(queued!.topicId)).rejects.toBeInstanceOf(
+      TopicAlreadyGeneratingError,
+    );
   });
 
   it("WF-6: analytics poller records metrics for a live post", async () => {

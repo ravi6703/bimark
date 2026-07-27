@@ -37,6 +37,10 @@ export function NewTopicForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Per-platform generation state — each platform is now its own request, so
+  // they finish independently and the operator can watch them land one by one
+  // instead of staring at a single spinner for the whole batch.
+  const [progress, setProgress] = useState<Record<string, "working" | "done" | "failed"> | null>(null);
 
   // Previous data for the open platform's pillar (Okara-inspired follow-up,
   // "show previous data") — what's already been said, so a new topic doesn't
@@ -135,8 +139,13 @@ export function NewTopicForm() {
 
   async function generate(extraMustSay: string) {
     setSubmitting(true);
+    setProgress(null);
     try {
-      const results = await api.createTopic({
+      // Two phases: queue every platform (fast), then generate each one in its
+      // own request, in parallel. Generation is tens of seconds per platform,
+      // so doing them all in a single request used to hit the serverless
+      // timeout as soon as more than a couple of platforms were selected.
+      const queued = await api.createTopic({
         topic: topic.trim(),
         pillar: pillar || undefined,
         platforms,
@@ -144,11 +153,31 @@ export function NewTopicForm() {
         why_now: whyNow || undefined,
         platformDetails: buildPlatformDetails(),
       });
-      setSuccess(
-        `Queued ${results.length} draft${results.length > 1 ? "s" : ""} for review: ` +
-          results.map((r) => r.platform).join(", "),
-      );
+
+      setProgress(Object.fromEntries(queued.map((q) => [q.platform, "working" as const])));
       resetForm();
+
+      const outcomes = await Promise.all(
+        queued.map(async (q) => {
+          try {
+            await api.generateDraft(q.topicId);
+            setProgress((p) => ({ ...p, [q.platform]: "done" }));
+            return true;
+          } catch {
+            // Left queued on the server — the drain cron retries it shortly,
+            // so this is "not yet", not "lost".
+            setProgress((p) => ({ ...p, [q.platform]: "failed" }));
+            return false;
+          }
+        }),
+      );
+
+      const ok = outcomes.filter(Boolean).length;
+      setSuccess(
+        ok === queued.length
+          ? `${ok} draft${ok > 1 ? "s" : ""} ready in the review queue.`
+          : `${ok} of ${queued.length} drafts ready. The rest are still queued and will be retried automatically.`,
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to submit");
     } finally {
@@ -437,11 +466,27 @@ export function NewTopicForm() {
       />
 
       {error && <div className="error-box" style={{ marginTop: 14 }}>{error}</div>}
+
+      {progress && (
+        <div className="callout-box" style={{ marginTop: 14 }} aria-live="polite">
+          {Object.entries(progress).map(([p, state]) => (
+            <div key={p} className="pillar-tag" style={{ marginBottom: 2 }}>
+              {state === "done" ? "✅" : state === "failed" ? "⏳" : "⋯"} <b>{p}</b>
+              {state === "working"
+                ? " — generating…"
+                : state === "done"
+                  ? " — ready for review"
+                  : " — still queued, will retry automatically"}
+            </div>
+          ))}
+        </div>
+      )}
+
       {success && <div className="success-box" style={{ marginTop: 14 }}>{success}</div>}
 
       <div className="row">
         <button className="btn primary" type="submit" disabled={submitting}>
-          {submitting ? "Checking…" : "Generate draft(s)"}
+          {submitting ? "Generating…" : "Generate draft(s)"}
         </button>
       </div>
     </form>
