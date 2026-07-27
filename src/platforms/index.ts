@@ -55,8 +55,27 @@ const LINKEDIN: PlatformDef = {
   key: "linkedin",
   label: "LinkedIn",
   reviewCheck:
-    "6. Fits the platform's length norm (roughly 120-200 words for LinkedIn, a short caption for Instagram).",
-  spec: `PLATFORM: LinkedIn. 120-200 words. No hashtag spam (max 3, relevant).`,
+    "6. Fits the platform's length norm (roughly 150-250 words for LinkedIn, a short caption for Instagram) " +
+    "and reads as a strong draft a human will finish, not as finished AI copy.",
+  // Move 4 — LinkedIn now demotes content it detects as AI-generated (reported
+  // at up to ~47% less reach) while organic reach is down roughly half year on
+  // year. Aiming for a publish-ready post is therefore aiming at the thing the
+  // algorithm penalises. The brief asks instead for a strongly-structured draft
+  // that visibly wants a human line, which is both better for reach and closer
+  // to how the team actually works — the reviewer's edit is the product's
+  // value, not its overhead. The 120-200 word floor also undershot what the
+  // format rewards, hence 150-250.
+  spec: `PLATFORM: LinkedIn. 150-250 words. No hashtag spam (max 3, relevant).
+This is a DRAFT a senior human will finish, not a finished post. Write it so
+their edit is easy and obvious:
+- Open on the specific insight or number, never on a throat-clearing sentence
+  ("In today's fast-changing world", "I've been thinking about...").
+- Vary sentence length. Avoid the tell-tale rhythm of uniform medium-length
+  sentences and tidy tricolons.
+- Leave exactly one clearly-marked gap for the human's own line, on its own
+  line, written as: [YOUR TAKE: <a specific prompt for what only they can add —
+  a first-hand observation, a client moment, a disagreement>].
+- No summarising final paragraph that restates the post. End on the substance.`,
   guidance(extra) {
     const { audience, cta } = (extra ?? {}) as LinkedInExtra;
     return (

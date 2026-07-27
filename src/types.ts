@@ -49,12 +49,24 @@ export interface Brand {
   created_at: Date;
 }
 
+/**
+ * What a pillar is FOR (migration 019). The generation prompt optimises for
+ * credibility over lead-gen, which is right for most pillars and wrong for the
+ * ones that exist to convert — this is how a pillar says which it is, instead
+ * of the whole product picking one answer for all of them.
+ */
+export type PillarIntent = "authority" | "conversion";
+
 export interface Pillar {
   id: number;
   brand_id: number;
   name: string;
   description: string | null;
   active: boolean;
+  intent: PillarIntent;
+  /** Where a 'conversion' pillar should point the reader. NULL on 'authority'
+   * pillars, and ignored if set there. */
+  conversion_target: string | null;
 }
 
 export interface OwnedAsset {
@@ -176,6 +188,10 @@ export interface Draft {
   topic_id: number;
   platform: string;
   body: string | null;
+  /** What the AI originally wrote (migration 020). Written once at creation and
+   * never updated, so an approve-with-edits no longer destroys the reference
+   * half of every eval case. Equal to `body` until a human edits. */
+  ai_body: string | null;
   variants: string[] | null;
   claims_used: string[] | null;
   low_source: boolean;
@@ -189,6 +205,41 @@ export interface Draft {
   /** Distinctiveness guard (audit Phase 3) — flags a likely repeat of a recent post. */
   repetitive: boolean;
   similar_to_draft_id: number | null;
+}
+
+/**
+ * One frozen AI-vs-human example (migration 020) — the AI's text and the text
+ * a person was actually willing to publish. Nobody authors these; they fall
+ * out of the team approving drafts with edits.
+ */
+export interface EvalCase {
+  id: number;
+  brand_id: number;
+  source_draft_id: number | null;
+  topic_id: number | null;
+  platform: string;
+  angle: string | null;
+  ai_body: string;
+  human_body: string;
+  prompt_version: string | null;
+  edit_distance: number | null;
+  added_by: string;
+  created_at: Date;
+}
+
+/** One scored replay of the golden set against one prompt version. */
+export interface EvalRun {
+  id: number;
+  brand_id: number;
+  prompt_version: string;
+  cases_run: number;
+  /** Higher is better — the replay landed closer to the human's version. */
+  mean_similarity: number | null;
+  /** Lower is better — less rewriting needed. */
+  mean_edit_distance: number | null;
+  detail: unknown;
+  ran_by: string;
+  ran_at: Date;
 }
 
 /** A draft joined with its topic's angle/pillar for dashboard display. */
@@ -234,6 +285,45 @@ export interface Post {
   scheduled_at: Date | null;
   published_at: Date | null;
   poll_until: Date | null;
+  /** The UTM campaign actually stamped onto this post's own links at publish
+   * (migration 018). NULL when the body carried no own-domain link to stamp —
+   * so a NULL here means "not attributable", never "attributed zero". */
+  utm_campaign: string | null;
+}
+
+/**
+ * A recorded business result (migration 018) — the thing the platform is
+ * actually judged on. `post_id` NULL means the brand got these leads in this
+ * week without them being attributable to a single post, which is the honest
+ * and common case.
+ */
+export interface Outcome {
+  id: number;
+  brand_id: number;
+  post_id: number | null;
+  period_start: string;
+  leads: number;
+  signups: number;
+  source: "manual" | "analytics" | "crm";
+  note: string | null;
+  recorded_by: string;
+  created_at: Date;
+}
+
+/**
+ * The team's own before/after estimate of what one post costs in time
+ * (migration 018). Both figures are human estimates and every surface that
+ * uses them says so — the platform supplies only the post count, which it can
+ * actually measure.
+ */
+export interface TimeBaseline {
+  id: number;
+  brand_id: number;
+  minutes_per_post_before: number;
+  minutes_per_post_after: number;
+  note: string | null;
+  recorded_by: string;
+  captured_at: Date;
 }
 
 /** A post joined with its draft/topic for the calendar view (audit Phase 2). */

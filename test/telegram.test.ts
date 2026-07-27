@@ -47,6 +47,7 @@ describe("draft preview message (§9 gate)", () => {
     topic_id: 1,
     platform: "linkedin",
     body: "A grounded draft.",
+    ai_body: "A grounded draft.",
     variants: [],
     claims_used: [],
     low_source: false,

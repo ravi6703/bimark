@@ -17,6 +17,7 @@ import type {
   GeoExtra,
   InstagramExtra,
   LinkedInExtra,
+  Pillar,
   ReviewerResult,
   RetrievedChunk,
   Topic,
@@ -64,7 +65,8 @@ async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
   const brand = await brands.get(topic.brand_id);
   const voiceGuide = brand?.voice_guide ?? DEFAULT_VOICE_GUIDE;
   const bannedTopics = brand?.banned_topics ?? [];
-  const pillarName = await resolvePillarName(topic);
+  const pillar = await resolvePillar(topic);
+  const pillarName = pillar?.name ?? "";
   const platform = normalizePlatform(topic.platform);
   const def = platformFor(platform);
 
@@ -87,7 +89,10 @@ async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
     .map((r) => r.angle)
     .filter((a) => a && a !== topic.angle);
 
-  // Step 2 — repurpose into a draft.
+  // Step 2 — repurpose into a draft. The pillar's intent (Move 4) decides
+  // whether this post offers a next step at all; 'authority' pillars keep the
+  // original credibility-only instruction untouched.
+  const intent = { pillarIntent: pillar?.intent, conversionTarget: pillar?.conversion_target };
   let draftOut = await repurpose({
     voiceGuide,
     angle: topic.angle ?? "",
@@ -97,6 +102,7 @@ async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
     format: topic.format_hint,
     platform,
     recentAngles,
+    ...intent,
   });
 
   // Step 3 & 4 — brand-safety review loop; escalate if persistently flagged.
@@ -129,6 +135,7 @@ async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
       format: topic.format_hint,
       platform,
       recentAngles,
+      ...intent,
     });
   }
 
@@ -291,10 +298,14 @@ export async function regenerateDraftImage(draftId: number): Promise<Draft> {
   return draft;
 }
 
-async function resolvePillarName(topic: Topic): Promise<string> {
-  if (topic.pillar_id == null) return "";
+async function resolvePillar(topic: Topic): Promise<Pillar | null> {
+  if (topic.pillar_id == null) return null;
   const list = await pillars.listActive(topic.brand_id);
-  return list.find((p) => p.id === topic.pillar_id)?.name ?? "";
+  return list.find((p) => p.id === topic.pillar_id) ?? null;
+}
+
+async function resolvePillarName(topic: Topic): Promise<string> {
+  return (await resolvePillar(topic))?.name ?? "";
 }
 
 function normalizePlatform(p: string): TargetPlatform {

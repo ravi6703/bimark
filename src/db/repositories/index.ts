@@ -11,8 +11,10 @@ import type {
   GeoCitationCheck,
   GeoProbeQuery,
   MediaAsset,
+  Outcome,
   OwnedAsset,
   Pillar,
+  PillarIntent,
   Post,
   PostWithContext,
   RedditOpportunity,
@@ -20,6 +22,7 @@ import type {
   ReviewerResult,
   SeoAudit,
   SeoCheck,
+  TimeBaseline,
   Topic,
   TopicStatus,
   User,
@@ -147,15 +150,34 @@ export const pillars = {
   },
   async update(
     id: number,
-    p: { name?: string; description?: string | null; active?: boolean },
+    p: {
+      name?: string;
+      description?: string | null;
+      active?: boolean;
+      intent?: PillarIntent;
+      conversion_target?: string | null;
+    },
   ): Promise<Pillar | null> {
+    // conversion_target is cleared explicitly rather than COALESCEd, so
+    // switching a pillar back to 'authority' can actually drop its old target
+    // instead of leaving a stale one behind the scenes.
     const { rows } = await query<Pillar>(
       `UPDATE pillars SET
          name = COALESCE($2, name),
          description = COALESCE($3, description),
-         active = COALESCE($4, active)
+         active = COALESCE($4, active),
+         intent = COALESCE($5::pillar_intent, intent),
+         conversion_target = CASE WHEN $6::boolean THEN $7 ELSE conversion_target END
        WHERE id = $1 RETURNING *`,
-      [id, p.name ?? null, p.description ?? null, p.active ?? null],
+      [
+        id,
+        p.name ?? null,
+        p.description ?? null,
+        p.active ?? null,
+        p.intent ?? null,
+        p.conversion_target !== undefined,
+        p.conversion_target ?? null,
+      ],
     );
     return rows[0] ?? null;
   },
@@ -163,10 +185,16 @@ export const pillars = {
     brand_id: number;
     name: string;
     description?: string;
+    intent?: PillarIntent;
+    conversion_target?: string | null;
   }): Promise<Pillar> {
     const { rows } = await query<Pillar>(
-      `INSERT INTO pillars (brand_id, name, description) VALUES ($1,$2,$3) RETURNING *`,
-      [p.brand_id, p.name, p.description ?? null],
+      // $4 is cast explicitly: without it COALESCE resolves the untyped
+      // parameter against the text literal and Postgres refuses to assign the
+      // result to the pillar_intent enum column.
+      `INSERT INTO pillars (brand_id, name, description, intent, conversion_target)
+       VALUES ($1,$2,$3,COALESCE($4::pillar_intent,'authority'),$5) RETURNING *`,
+      [p.brand_id, p.name, p.description ?? null, p.intent ?? null, p.conversion_target ?? null],
     );
     return rows[0]!;
   },
@@ -575,10 +603,13 @@ export const drafts = {
     status: DraftStatus;
   }): Promise<Draft> {
     const { rows } = await query<Draft>(
+      // ai_body is written once, from the same text as body, and never updated
+      // again (Move 5) — setBody below overwrites body with the human's edit,
+      // which used to destroy the only record of what the AI actually wrote.
       `INSERT INTO drafts
-         (topic_id, platform, body, variants, claims_used, low_source, model_used,
+         (topic_id, platform, body, ai_body, variants, claims_used, low_source, model_used,
           prompt_version, reviewer_result, review_retries, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+       VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [
         d.topic_id,
         d.platform,
@@ -598,6 +629,8 @@ export const drafts = {
   async setStatus(id: number, status: DraftStatus): Promise<void> {
     await query("UPDATE drafts SET status = $2 WHERE id = $1", [id, status]);
   },
+  /** Deliberately does NOT touch ai_body — the AI's original is the reference
+   * half of every eval case (Move 5) and must survive the human's edit. */
   async setBody(id: number, body: string, status: DraftStatus): Promise<void> {
     await query("UPDATE drafts SET body = $2, status = $3 WHERE id = $1", [id, body, status]);
   },
@@ -792,10 +825,14 @@ export const posts = {
     scheduled_at: Date | null;
     published_at: Date | null;
     poll_until: Date | null;
+    /** Set only when a link in the body actually carried the tag (Move 1) —
+     * NULL means this post has nothing attributable, which the scoreboard
+     * reports as such rather than counting it as a zero-lead post. */
+    utm_campaign?: string | null;
   }): Promise<Post> {
     const { rows } = await query<Post>(
-      `INSERT INTO posts (draft_id, platform, external_id, url, scheduled_at, published_at, poll_until)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      `INSERT INTO posts (draft_id, platform, external_id, url, scheduled_at, published_at, poll_until, utm_campaign)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [
         p.draft_id,
         p.platform,
@@ -804,6 +841,7 @@ export const posts = {
         p.scheduled_at,
         p.published_at,
         p.poll_until,
+        p.utm_campaign ?? null,
       ],
     );
     return rows[0]!;
@@ -1196,5 +1234,103 @@ export const users = {
       "SELECT id, name, active, created_at FROM users ORDER BY id",
     );
     return rows;
+  },
+};
+
+// ── Outcomes (Move 1 — the thing the platform is actually judged on) ──────────
+export const outcomes = {
+  async record(o: {
+    brand_id: number;
+    post_id?: number | null;
+    period_start: string;
+    leads: number;
+    signups: number;
+    source?: "manual" | "analytics" | "crm";
+    note?: string | null;
+    recorded_by: string;
+  }): Promise<Outcome> {
+    const { rows } = await query<Outcome>(
+      `INSERT INTO outcomes (brand_id, post_id, period_start, leads, signups, source, note, recorded_by)
+       VALUES ($1,$2,$3,$4,$5,COALESCE($6,'manual'),$7,$8) RETURNING *`,
+      [
+        o.brand_id,
+        o.post_id ?? null,
+        o.period_start,
+        o.leads,
+        o.signups,
+        o.source ?? null,
+        o.note ?? null,
+        o.recorded_by,
+      ],
+    );
+    return rows[0]!;
+  },
+  async list(brandId: number, limit = 26): Promise<Outcome[]> {
+    const { rows } = await query<Outcome>(
+      `SELECT * FROM outcomes WHERE brand_id = $1
+        ORDER BY period_start DESC, id DESC LIMIT $2`,
+      [brandId, limit],
+    );
+    return rows;
+  },
+  async remove(id: number, brandId: number): Promise<boolean> {
+    const { rowCount } = await query("DELETE FROM outcomes WHERE id = $1 AND brand_id = $2", [
+      id,
+      brandId,
+    ]);
+    return (rowCount ?? 0) > 0;
+  },
+  /** Totals since a date — what the scoreboard reports as attributable inbound. */
+  async totalsSince(
+    brandId: number,
+    since: string,
+  ): Promise<{ leads: number; signups: number; entries: number }> {
+    const { rows } = await query<{ leads: string; signups: string; entries: string }>(
+      `SELECT COALESCE(sum(leads),0)::int AS leads,
+              COALESCE(sum(signups),0)::int AS signups,
+              count(*)::int AS entries
+         FROM outcomes WHERE brand_id = $1 AND period_start >= $2`,
+      [brandId, since],
+    );
+    const r = rows[0];
+    return {
+      leads: Number(r?.leads ?? 0),
+      signups: Number(r?.signups ?? 0),
+      entries: Number(r?.entries ?? 0),
+    };
+  },
+};
+
+// ── Time baselines (Move 1 — hours saved, honestly constructed) ───────────────
+export const timeBaselines = {
+  /** The current baseline is simply the most recent one recorded; older rows
+   * are kept so a changed estimate doesn't silently rewrite past reporting. */
+  async current(brandId: number): Promise<TimeBaseline | null> {
+    const { rows } = await query<TimeBaseline>(
+      "SELECT * FROM time_baselines WHERE brand_id = $1 ORDER BY captured_at DESC, id DESC LIMIT 1",
+      [brandId],
+    );
+    return rows[0] ?? null;
+  },
+  async record(b: {
+    brand_id: number;
+    minutes_per_post_before: number;
+    minutes_per_post_after: number;
+    note?: string | null;
+    recorded_by: string;
+  }): Promise<TimeBaseline> {
+    const { rows } = await query<TimeBaseline>(
+      `INSERT INTO time_baselines
+         (brand_id, minutes_per_post_before, minutes_per_post_after, note, recorded_by)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [
+        b.brand_id,
+        b.minutes_per_post_before,
+        b.minutes_per_post_after,
+        b.note ?? null,
+        b.recorded_by,
+      ],
+    );
+    return rows[0]!;
   },
 };

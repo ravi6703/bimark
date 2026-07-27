@@ -1,6 +1,6 @@
 import { getLlm, parseJson } from "../llm/index.js";
 import type { LlmProvider } from "../llm/types.js";
-import type { RetrievedChunk } from "../types.js";
+import type { PillarIntent, RetrievedChunk } from "../types.js";
 import { capForPlatform, platformFor } from "../platforms/index.js";
 import { PROMPT_VERSION, repurposePrompt, type TargetPlatform } from "./prompts.js";
 
@@ -33,6 +33,10 @@ export async function repurpose(
     format?: string | null;
     platform?: TargetPlatform;
     recentAngles?: string[];
+    /** What the pillar is for (Move 4) — decides whether this post offers a
+     * next step at all. Defaults to 'authority', i.e. it doesn't. */
+    pillarIntent?: PillarIntent;
+    conversionTarget?: string | null;
   },
   llm: LlmProvider = getLlm(),
 ): Promise<RepurposeOutput> {
@@ -47,6 +51,8 @@ export async function repurpose(
     format: input.format ?? null,
     platform,
     recentAngles: input.recentAngles,
+    pillarIntent: input.pillarIntent,
+    conversionTarget: input.conversionTarget,
   });
 
   const res = await llm.complete({

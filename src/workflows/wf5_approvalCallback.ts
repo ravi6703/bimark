@@ -6,7 +6,8 @@ import { editDistance } from "../metrics/editDistance.js";
 import { getPublisher } from "../publish/index.js";
 import type { PublishCredentials } from "../publish/types.js";
 import { getTelegram } from "../telegram/client.js";
-import type { Draft, DraftStatus, Platform, Post } from "../types.js";
+import { buildUtmParams, stampBodyLinks } from "../publish/utm.js";
+import type { Brand, Draft, DraftStatus, Platform, Post } from "../types.js";
 
 /**
  * Per-brand publish credentials (multi-brand support follow-up) — each brand
@@ -14,10 +15,7 @@ import type { Draft, DraftStatus, Platform, Post } from "../types.js";
  * default (see db/migrations/010_brand_publish_credentials.sql). Falls back
  * to "no override" for any brand that hasn't had its own connected.
  */
-async function brandPublishCreds(topicId: number): Promise<PublishCredentials> {
-  const topic = await topics.get(topicId);
-  if (!topic) return {};
-  const brand = await brands.get(topic.brand_id);
+function brandPublishCreds(brand: Brand | null): PublishCredentials {
   if (!brand) return {};
   return {
     apiKeyOverride: brand.ayrshare_api_key ?? undefined,
@@ -251,13 +249,29 @@ async function publishNow(
     );
   }
 
-  const creds = await brandPublishCreds(draft.topic_id);
+  const topic = await topics.get(draft.topic_id);
+  const brand = topic ? await brands.get(topic.brand_id) : null;
+
+  // Move 1 — stamp the brand's own links so this post's traffic is separable
+  // from the rest of the site's. Only own-domain links are touched, and a post
+  // with none is published verbatim and records no utm_campaign, so the
+  // scoreboard never claims attribution that doesn't exist.
+  const utm = buildUtmParams({
+    platform: draft.platform,
+    campaignId: topic?.campaign_id ?? null,
+    topicId: draft.topic_id,
+  });
+  const { text: outgoing, stamped } = stampBodyLinks(text, brand?.site_url, utm);
+  if (stamped > 0) {
+    logger.info({ draftId: draft.id, stamped, campaign: utm.campaign }, "WF-5: stamped UTM on own-domain links");
+  }
+
   const result = await getPublisher().publish({
     platform: draft.platform,
-    text,
+    text: outgoing,
     scheduledAt,
     mediaUrls,
-    ...creds,
+    ...brandPublishCreds(brand),
   });
 
   const now = new Date();
@@ -269,5 +283,6 @@ async function publishNow(
     scheduled_at: result.scheduledAt,
     published_at: result.publishedAt,
     poll_until: new Date(now.getTime() + POLL_WINDOW_HOURS * 3600 * 1000),
+    utm_campaign: stamped > 0 ? utm.campaign : null,
   });
 }

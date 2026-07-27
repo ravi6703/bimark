@@ -4,11 +4,20 @@ import { parseJson } from "../src/llm/index.js";
 import { generatePitch } from "../src/agents/dailyPitch.js";
 import { repurpose } from "../src/agents/repurpose.js";
 import { review, heuristicReview } from "../src/agents/reviewer.js";
+import { PROMPT_VERSION } from "../src/agents/prompts.js";
 import type { OwnedAsset, Pillar, RetrievedChunk } from "../src/types.js";
 
 const now = new Date();
 function pillar(id: number, name: string): Pillar {
-  return { id, brand_id: 1, name, description: `${name} desc`, active: true };
+  return {
+    id,
+    brand_id: 1,
+    name,
+    description: `${name} desc`,
+    active: true,
+    intent: "authority",
+    conversion_target: null,
+  };
 }
 function asset(id: number, pillarHint: number, title: string, text: string): OwnedAsset {
   return {
@@ -63,7 +72,10 @@ describe("Repurposing agent (§4 / §17.3)", () => {
     expect(out.body.length).toBeGreaterThan(20);
     expect(Array.isArray(out.variants)).toBe(true);
     expect(out.modelUsed).toContain("mock");
-    expect(out.promptVersion).toBe("v1");
+    // Asserted against the constant, not a literal — bumping PROMPT_VERSION is
+    // a deliberate act (it's how prompt changes become measurable, see
+    // src/eval), and shouldn't break an unrelated test every time.
+    expect(out.promptVersion).toBe(PROMPT_VERSION);
   });
 });
 

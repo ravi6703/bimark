@@ -1,10 +1,11 @@
 import { platformFor, type PlatformKey } from "../platforms/index.js";
+import type { PillarIntent } from "../types.js";
 /**
  * Agent prompts (§17), starter versions. Version them so you can measure which
  * changes move the §7 first-pass-approval bar. Bump PROMPT_VERSION whenever a
  * template below changes; it is persisted on every draft (`prompt_version`).
  */
-export const PROMPT_VERSION = "v1";
+export const PROMPT_VERSION = "v2";
 
 /** §17.1 — brand voice guide. Seeded per-brand in the DB; this is the default. */
 export const DEFAULT_VOICE_GUIDE = `BOARD INFINITY — BRAND VOICE  [confirm/edit with the team]
@@ -70,12 +71,35 @@ export function repurposePrompt(input: {
    * "show previous data") — steers the model away from repeating itself,
    * on top of the after-the-fact distinctiveness guard. */
   recentAngles?: string[];
+  /**
+   * What this pillar is FOR (Move 4, migration 019). Defaults to 'authority',
+   * which reproduces the original credibility-only instruction verbatim — so
+   * nothing changes for an existing pillar until someone deliberately marks
+   * one 'conversion'.
+   */
+  pillarIntent?: PillarIntent;
+  /** Where a 'conversion' pillar should point the reader. Ignored otherwise. */
+  conversionTarget?: string | null;
 }): { system: string; user: string } {
-  const system = `You are a senior B2B content writer for Board Infinity. Objective: BRAND
-CREDIBILITY, not lead-gen.`;
+  // Move 4 — the objective is now per-pillar rather than one answer for the
+  // whole product. Credibility content that never offers a next step generates
+  // no attributable inbound; CTA-stuffed content destroys the credibility that
+  // makes the inbound worth having. Pillars decide which trade they're making.
+  const system =
+    input.pillarIntent === "conversion"
+      ? `You are a senior B2B content writer for Board Infinity. Objective: BRAND
+CREDIBILITY that earns a next step. Credibility comes first and is
+non-negotiable — the post must stand on its own insight even if the reader
+never clicks. Exactly ONE next step, offered once, at the end, in a plain
+sentence. Never engagement-bait, never urgency, never "DM me".`
+      : `You are a senior B2B content writer for Board Infinity. Objective: BRAND
+CREDIBILITY, not lead-gen. Do not include a call to action.`;
   const extras = [
     input.format ? `DESIRED FORMAT: ${input.format}` : "",
     input.mustSay ? `MUST-SAY POINTS: ${input.mustSay}` : "",
+    input.pillarIntent === "conversion" && input.conversionTarget
+      ? `NEXT STEP TO OFFER (once, at the end, plainly): ${input.conversionTarget}`
+      : "",
     input.recentAngles?.length
       ? `RECENTLY COVERED ON THIS PLATFORM/PILLAR (find a genuinely new angle, don't rehash these):\n- ${input.recentAngles.join("\n- ")}`
       : "",
