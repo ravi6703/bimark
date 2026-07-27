@@ -1070,6 +1070,8 @@ input[type="radio"] {
   font-size: 18px;
   font-weight: 700;
 }
+.portfolio-stat-value.tone-green { color: var(--green); }
+.portfolio-stat-value.tone-amber { color: var(--amber); }
 .portfolio-stat-label {
   font-size: 11px;
   color: var(--text-dim);

@@ -183,7 +183,18 @@ export const pillars = {
 export const channels = {
   async list(brandId: number): Promise<ChannelConfig[]> {
     const { rows } = await query<ChannelConfig>(
-      "SELECT * FROM channel_configs WHERE brand_id = $1 AND active = true",
+      // Ordered so a tie on "furthest behind target" resolves the same way
+      // every time — pickPitchPlatform reads this and an unordered result
+      // would make the daily pitch's channel choice nondeterministic.
+      "SELECT * FROM channel_configs WHERE brand_id = $1 AND active = true ORDER BY platform",
+      [brandId],
+    );
+    return rows;
+  },
+  /** Includes inactive channels — the Channels screen shows those too, greyed. */
+  async listAll(brandId: number): Promise<ChannelConfig[]> {
+    const { rows } = await query<ChannelConfig>(
+      "SELECT * FROM channel_configs WHERE brand_id = $1 ORDER BY platform",
       [brandId],
     );
     return rows;
@@ -199,6 +210,28 @@ export const channels = {
       `INSERT INTO channel_configs (brand_id, platform, weekly_target, allowed_media, monthly_budget_usd)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
       [c.brand_id, c.platform, c.weekly_target, c.allowed_media, c.monthly_budget_usd ?? null],
+    );
+    return rows[0]!;
+  },
+  /**
+   * Set a channel's cadence/active flag, creating the row if this brand has
+   * never configured that channel. Needed because weekly_target now actually
+   * drives which channel the morning pitch targets (WF-1.2) — before this it
+   * could only be changed by editing the seed.
+   */
+  async upsert(
+    brandId: number,
+    platform: string,
+    patch: { weekly_target?: number; active?: boolean },
+  ): Promise<ChannelConfig> {
+    const { rows } = await query<ChannelConfig>(
+      `INSERT INTO channel_configs (brand_id, platform, weekly_target, active)
+       VALUES ($1, $2, COALESCE($3, 0), COALESCE($4, true))
+       ON CONFLICT (brand_id, platform) DO UPDATE SET
+         weekly_target = COALESCE($3, channel_configs.weekly_target),
+         active        = COALESCE($4, channel_configs.active)
+       RETURNING *`,
+      [brandId, platform, patch.weekly_target ?? null, patch.active ?? null],
     );
     return rows[0]!;
   },
@@ -487,6 +520,19 @@ export const topics = {
 
 // ── Drafts ────────────────────────────────────────────────────────────────────
 export const drafts = {
+  /** Drafts in a given status, counted per platform — the Channels screen's
+   * "waiting on you" number, one query instead of one per channel. */
+  async countByPlatform(brandId: number, status: DraftStatus): Promise<Record<string, number>> {
+    const { rows } = await query<{ platform: string; n: number }>(
+      `SELECT d.platform, count(*)::int AS n
+         FROM drafts d
+         JOIN topics t ON t.id = d.topic_id
+        WHERE t.brand_id = $1 AND d.status = $2
+        GROUP BY d.platform`,
+      [brandId, status],
+    );
+    return Object.fromEntries(rows.map((r) => [r.platform, Number(r.n)]));
+  },
   async get(id: number): Promise<Draft | null> {
     const { rows } = await query<Draft>("SELECT * FROM drafts WHERE id = $1", [id]);
     return rows[0] ?? null;
@@ -778,6 +824,19 @@ export const posts = {
         WHERE t.brand_id = $1 AND po.published_at >= $2
         GROUP BY po.platform`,
       [brandId, since],
+    );
+    return Object.fromEntries(rows.map((r) => [r.platform, Number(r.n)]));
+  },
+  /** Lifetime published count per platform — the Channels screen's "results". */
+  async countPublishedByPlatform(brandId: number): Promise<Record<string, number>> {
+    const { rows } = await query<{ platform: string; n: number }>(
+      `SELECT po.platform, count(*)::int AS n
+         FROM posts po
+         JOIN drafts d ON d.id = po.draft_id
+         JOIN topics t ON t.id = d.topic_id
+        WHERE t.brand_id = $1 AND po.published_at IS NOT NULL
+        GROUP BY po.platform`,
+      [brandId],
     );
     return Object.fromEntries(rows.map((r) => [r.platform, Number(r.n)]));
   },
