@@ -130,6 +130,9 @@ export interface Topic {
   /** The idea this per-channel job belongs to (migration 015). NULL only for
    * rows predating the campaign entity that the backfill couldn't group. */
   campaign_id: number | null;
+  /** When generation was claimed (migration 017) — lets a stalled `drafting`
+   * topic be told apart from one that just started. NULL unless drafting. */
+  drafting_started_at: Date | null;
   created_at: Date;
 }
 

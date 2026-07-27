@@ -465,10 +465,34 @@ export const topics = {
    */
   async claimForDrafting(id: number): Promise<Topic | null> {
     const { rows } = await query<Topic>(
-      "UPDATE topics SET status = 'drafting' WHERE id = $1 AND status = 'picked' RETURNING *",
+      `UPDATE topics SET status = 'drafting', drafting_started_at = now()
+        WHERE id = $1 AND status = 'picked' RETURNING *`,
       [id],
     );
     return rows[0] ?? null;
+  },
+  /**
+   * Return topics that have been stuck in `drafting` longer than any real
+   * generation could take, so they can be retried.
+   *
+   * WF-4's own error handling releases a topic when generation throws, but a
+   * serverless function killed mid-flight (the 60s cap, an eviction) runs no
+   * catch block — those topics would otherwise sit in `drafting` forever with
+   * no draft, invisible to the drain sweep, which only looks for `picked`.
+   *
+   * `minAgeMinutes` must exceed the function cap comfortably: releasing a
+   * healthy in-flight topic would let a second worker claim it and generate
+   * the same draft twice.
+   */
+  async releaseStalledDrafting(minAgeMinutes = 10): Promise<number> {
+    const { rowCount } = await query(
+      `UPDATE topics SET status = 'picked', drafting_started_at = NULL
+        WHERE status = 'drafting'
+          AND drafting_started_at IS NOT NULL
+          AND drafting_started_at < now() - ($1 || ' minutes')::interval`,
+      [minAgeMinutes],
+    );
+    return rowCount ?? 0;
   },
   /**
    * Topics queued for generation that nobody ever picked up — the drain cron's

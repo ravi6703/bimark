@@ -164,6 +164,43 @@ d("end-to-end pipeline (§16 WF-1..WF-7)", () => {
     );
   });
 
+  it("a generation killed mid-flight is recovered, not stranded in drafting", async () => {
+    const { queued } = await queueManualIntake({
+      brand_id: brandId,
+      topic: "A topic whose generation gets killed",
+      platforms: ["linkedin"],
+    });
+    const topicId = queued[0]!.topicId;
+
+    // Simulate the serverless runtime killing the function mid-generation:
+    // the topic is claimed, but no catch block ever runs, so nothing releases
+    // it. WF-4's own error handling can't help here.
+    const claimed = await topics.claimForDrafting(topicId);
+    expect(claimed!.status).toBe("drafting");
+    expect(await topics.listPendingGeneration(0, 10)).not.toContainEqual(
+      expect.objectContaining({ id: topicId }),
+    );
+
+    // Not yet old enough — releasing an in-flight topic would double-generate.
+    expect(await topics.releaseStalledDrafting(10)).toBe(0);
+    expect((await topics.get(topicId))!.status).toBe("drafting");
+
+    // Past the grace period it's presumed dead and returned to the queue.
+    await query(
+      "UPDATE topics SET drafting_started_at = now() - interval '30 minutes' WHERE id = $1",
+      [topicId],
+    );
+    expect(await topics.releaseStalledDrafting(10)).toBeGreaterThanOrEqual(1);
+
+    const released = await topics.get(topicId);
+    expect(released!.status).toBe("picked");
+    expect(released!.drafting_started_at).toBeNull();
+
+    // And it generates cleanly on the retry.
+    const draft = await runRepurposeReview(topicId);
+    expect(draft.status).toBe("pending_approval");
+  });
+
   it("WF-6: analytics poller records metrics for a live post", async () => {
     const { polled } = await runAnalyticsPoller(new Date());
     expect(polled).toBeGreaterThanOrEqual(1);

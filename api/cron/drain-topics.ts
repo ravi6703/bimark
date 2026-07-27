@@ -14,18 +14,36 @@ import {
  * the operator closes the tab mid-run, or a generate request fails, those
  * topics would sit in `picked` forever. This sweeps them up.
  *
- * Deliberately small per run: each generation is tens of seconds and the
- * function cap is 60s, so it takes BATCH per run and lets the next run
- * continue — the claim in topics.claimForDrafting keeps concurrent runs (and
- * a returning browser) from double-generating the same topic.
+ * ONE generation per run. Each is tens of seconds against a 60s function cap,
+ * so draining two serially would see the second killed mid-flight — and a
+ * killed function runs no catch block, so that topic would be stranded in
+ * `drafting` rather than released. At every 10 minutes this still clears six
+ * an hour, which is ample for a safety net.
+ *
+ * The claim in topics.claimForDrafting keeps concurrent runs (and a returning
+ * browser) from double-generating the same topic.
  */
-const BATCH = 2;
+const BATCH = 1;
 /** Grace period so this never races the dashboard's own generate calls. */
 const MIN_AGE_MINUTES = 5;
+/**
+ * How long a topic may sit in `drafting` before it's presumed dead. Must
+ * comfortably exceed the 60s function cap: releasing a healthy in-flight topic
+ * would let a second worker claim it and generate the same draft twice.
+ */
+const STALLED_AFTER_MINUTES = 10;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!assertCronAuthorized(req, res)) return;
   try {
+    // Recover anything a killed function left mid-generation before looking
+    // for new work — those topics are invisible to the sweep below, which
+    // only sees `picked`.
+    const recovered = await topics.releaseStalledDrafting(STALLED_AFTER_MINUTES);
+    if (recovered > 0) {
+      logger.warn({ recovered }, "cron: released topics stalled in drafting");
+    }
+
     const pending = await topics.listPendingGeneration(MIN_AGE_MINUTES, BATCH);
     const results = [];
     for (const topic of pending) {
@@ -41,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (results.length > 0) {
       logger.info({ drained: results.length }, "cron: drained queued topics");
     }
-    res.status(200).json({ ok: true, drained: results.length, results });
+    res.status(200).json({ ok: true, recovered, drained: results.length, results });
   } catch (err) {
     logger.error({ err }, "cron: drain-topics failed");
     res.status(500).json({ error: "internal error" });
