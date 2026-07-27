@@ -12,7 +12,7 @@ import { ChannelsView } from "./components/ChannelsView";
 import { InsightsView } from "./components/InsightsView";
 import { CalendarView } from "./components/CalendarView";
 import { CompetitorsView } from "./components/CompetitorsView";
-import { OverviewView } from "./components/OverviewView";
+import { TodayView } from "./components/TodayView";
 import { GeoVisibilityView } from "./components/GeoVisibilityView";
 import { SeoAuditView } from "./components/SeoAuditView";
 import { RedditView } from "./components/RedditView";
@@ -33,11 +33,11 @@ const TABS = [
     subtitle: "Every brand line at a glance, in one place — for a leadership/founder view.",
   },
   {
-    key: "overview",
-    label: "Overview",
+    key: "today",
+    label: "Today",
     icon: "🏠",
-    title: "Overview",
-    subtitle: "Where things stand right now for this brand.",
+    title: "Today",
+    subtitle: "What the agents found, what's waiting on you, and where the brand stands.",
   },
   {
     key: "queue",
@@ -344,11 +344,11 @@ export function App() {
           <PortfolioView
             onOpenBrand={(slug) => {
               handleBrandChange(slug);
-              goTo("overview");
+              goTo("today");
             }}
           />
         )}
-        {tab === "overview" && <OverviewView onNavigate={(k) => goTo(k as TabKey)} />}
+        {tab === "today" && <TodayView onNavigate={(k) => goTo(k as TabKey)} />}
         {tab === "queue" && <DraftQueue onDraftsChanged={refreshPendingCount} />}
         {tab === "calendar" && <CalendarView />}
         {tab === "new" && <NewTopicForm />}

@@ -258,6 +258,16 @@ export interface Campaign {
   }[];
 }
 
+/** One entry in the agent feed — what an agent found or drafted. */
+export interface FeedItem {
+  kind: "draft" | "pitch" | "competitor" | "reddit" | "geo" | "seo" | "memo";
+  at: string;
+  title: string;
+  detail: string | null;
+  actionable: boolean;
+  tab: string;
+}
+
 /** One channel's live state — what's waiting, how the week's output compares
  * to its configured cadence, and lifetime published. */
 export interface ChannelStatus {
@@ -523,6 +533,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ brand_id: 1, ...input }),
     });
+  },
+
+  /** The agent feed — everything the agents found or drafted, newest first. */
+  async getFeed(): Promise<FeedItem[]> {
+    const { items } = await request<{ items: FeedItem[] }>("/feed");
+    return items;
   },
 
   async listChannels(): Promise<ChannelStatus[]> {
