@@ -79,7 +79,7 @@ export async function harvestCases(
 
   let added = 0;
   for (const r of rows) {
-    await query(
+    const { rowCount } = await query(
       `INSERT INTO eval_cases
          (brand_id, source_draft_id, topic_id, platform, angle, ai_body, human_body,
           prompt_version, edit_distance, added_by)
@@ -98,7 +98,10 @@ export async function harvestCases(
         addedBy,
       ],
     );
-    added += 1;
+    // Count what the INSERT actually wrote. ON CONFLICT DO NOTHING makes this
+    // a no-op when a concurrent harvest already inserted the row, and counting
+    // the loop iteration instead would report cases that were never added.
+    added += rowCount ?? 0;
   }
   logger.info({ brandId, added }, "eval: harvested golden-set cases");
   return { added, skipped: rows.length - added };
@@ -108,6 +111,34 @@ export async function listCases(brandId: number, limit = 100): Promise<EvalCase[
   const { rows } = await query<EvalCase>(
     "SELECT * FROM eval_cases WHERE brand_id = $1 ORDER BY created_at DESC LIMIT $2",
     [brandId, limit],
+  );
+  return rows;
+}
+
+/**
+ * Cases not yet scored under `promptVersion`.
+ *
+ * Without this, a batched run would re-score the same first N cases forever
+ * while cheerfully reporting "run again to continue" — the caller would burn
+ * generations and never reach the rest of the set. Scored case ids are read
+ * back out of each run's own detail payload, so no extra bookkeeping table is
+ * needed to make the batching actually progress.
+ */
+async function unscoredCases(brandId: number, promptVersion: string): Promise<EvalCase[]> {
+  const { rows } = await query<EvalCase>(
+    `SELECT c.* FROM eval_cases c
+      WHERE c.brand_id = $1
+        AND c.id NOT IN (
+          SELECT (d->>'caseId')::int
+            FROM eval_runs r
+            CROSS JOIN LATERAL jsonb_array_elements(r.detail) d
+           WHERE r.brand_id = $1
+             AND r.prompt_version = $2
+             AND jsonb_typeof(r.detail) = 'array'
+             AND d->>'caseId' IS NOT NULL
+        )
+      ORDER BY c.created_at DESC`,
+    [brandId, promptVersion],
   );
   return rows;
 }
@@ -143,8 +174,10 @@ export async function runEval(
   ranBy: string,
   maxCases = 5,
 ): Promise<{ run: EvalRun; scores: CaseScore[]; remaining: number }> {
-  const all = await listCases(brandId, 500);
-  const batch = all.slice(0, maxCases);
+  // Only cases this prompt version hasn't seen — otherwise repeated calls
+  // re-score the same batch and `remaining` never reaches zero.
+  const pending = await unscoredCases(brandId, PROMPT_VERSION);
+  const batch = pending.slice(0, maxCases);
   const brand = await brands.get(brandId);
   const voiceGuide = brand?.voice_guide ?? DEFAULT_VOICE_GUIDE;
   const embedder = getEmbedder();
@@ -212,5 +245,5 @@ export async function runEval(
     ],
   );
 
-  return { run: rows[0]!, scores, remaining: Math.max(0, all.length - batch.length) };
+  return { run: rows[0]!, scores, remaining: Math.max(0, pending.length - batch.length) };
 }
