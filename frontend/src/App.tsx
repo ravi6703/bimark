@@ -8,6 +8,7 @@ import { PillarsView } from "./components/PillarsView";
 import { MetricsView } from "./components/MetricsView";
 import { TeamView } from "./components/TeamView";
 import { CampaignsView } from "./components/CampaignsView";
+import { ChannelsView } from "./components/ChannelsView";
 import { InsightsView } from "./components/InsightsView";
 import { CalendarView } from "./components/CalendarView";
 import { CompetitorsView } from "./components/CompetitorsView";
@@ -73,6 +74,14 @@ const TABS = [
     icon: "💡",
     title: "Campaigns",
     subtitle: "One card per idea, with every channel it goes out on and where each one stands.",
+    group: "Workspace",
+  },
+  {
+    key: "channels",
+    label: "Channels",
+    icon: "📡",
+    title: "Channels",
+    subtitle: "Each channel's own queue, cadence and results.",
     group: "Workspace",
   },
   {
@@ -344,6 +353,7 @@ export function App() {
         {tab === "calendar" && <CalendarView />}
         {tab === "new" && <NewTopicForm />}
         {tab === "campaigns" && <CampaignsView onNavigate={(k) => goTo(k as TabKey)} />}
+        {tab === "channels" && <ChannelsView />}
         {tab === "insights" && <InsightsView />}
         {tab === "competitors" && <CompetitorsView />}
         {tab === "geo" && <GeoVisibilityView />}

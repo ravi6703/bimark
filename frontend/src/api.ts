@@ -258,6 +258,20 @@ export interface Campaign {
   }[];
 }
 
+/** One channel's live state — what's waiting, how the week's output compares
+ * to its configured cadence, and lifetime published. */
+export interface ChannelStatus {
+  platform: string;
+  label: string;
+  autoPublish: boolean;
+  /** null when this brand has never set a cadence for the channel. */
+  weeklyTarget: number | null;
+  active: boolean;
+  postsThisWeek: number;
+  publishedTotal: number;
+  pendingReview: number;
+}
+
 /** Technical SEO audit (Okara-comparison follow-up) — real, rule-based
  * checks against the brand's actual site, not an estimated score. */
 export interface SeoCheck {
@@ -508,6 +522,23 @@ export const api = {
     return request("/webhooks/manual-intake", {
       method: "POST",
       body: JSON.stringify({ brand_id: 1, ...input }),
+    });
+  },
+
+  async listChannels(): Promise<ChannelStatus[]> {
+    const { channels } = await request<{ channels: ChannelStatus[] }>("/channels");
+    return channels;
+  },
+
+  /** Set a channel's weekly cadence — this drives which channel the morning
+   * pitch targets, so it has to be settable from the dashboard. */
+  async updateChannel(
+    platform: string,
+    patch: { weekly_target?: number; active?: boolean },
+  ): Promise<void> {
+    await request("/channels", {
+      method: "PATCH",
+      body: JSON.stringify({ platform, ...patch }),
     });
   },
 
