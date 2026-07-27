@@ -1,3 +1,4 @@
+import { platformFor, type PlatformKey } from "../platforms/index.js";
 /**
  * Agent prompts (§17), starter versions. Version them so you can measure which
  * changes move the §7 first-pass-approval bar. Bump PROMPT_VERSION whenever a
@@ -50,45 +51,11 @@ Return ONLY JSON: {"A":{"angle","pillar","asset_id","why_now"},
  * no image generation) — matches what's actually built (§20: image gen is a
  * later phase).
  */
-export type TargetPlatform = "linkedin" | "x" | "instagram" | "geo" | "youtube";
-
-function platformSpec(platform: TargetPlatform): string {
-  switch (platform) {
-    case "youtube":
-      return `PLATFORM: YouTube script/outline. There is no video-generation pipeline here —
-this is a SCRIPT for a human to shoot, not a finished video. Structure it as:
-TITLE: a specific, searchable title (not clickbait).
-HOOK: the first 10-15 seconds, spoken, that earns a viewer staying past the intro.
-TALKING POINTS: 3-5 numbered points, each one concrete idea grounded in the
-  source material, in the order they'd be spoken.
-CTA: one line, low-pressure (e.g. "more on this in our resources").
-Plain spoken language, not written prose — short sentences a person can say
-out loud. No hashtags.`;
-    case "x":
-      return `PLATFORM: X (Twitter). A single post, <=280 characters INCLUDING spaces
-and any hashtags. One sharp idea, not a summary of the LinkedIn version.
-At most 1 hashtag. No thread — one post only.`;
-    case "instagram":
-      return `PLATFORM: Instagram caption. 3-6 short lines, warmer and more direct than
-LinkedIn but still credible (never hype-y). End with up to 5 relevant,
-specific hashtags (no generic tags like #motivation). This is a CAPTION —
-assume an image/carousel accompanies it; do not describe a nonexistent visual.`;
-    case "geo":
-      return `PLATFORM: none — this is GEO content (generative-engine optimization): a
-direct-answer piece written to be found and cited by AI answer engines
-(ChatGPT, Perplexity, AI Overviews), not posted to a social feed. Structure:
-- Open with the target question as a heading, then answer it in the FIRST
-  sentence, plainly and completely — assume the reader/crawler only ever
-  sees that first sentence.
-- 150-400 words. Plain factual prose, not persuasion — no hooks, no CTAs,
-  no hashtags, no engagement bait. Short paragraphs, each making one point.
-- Every factual claim must be independently checkable against the source
-  material — this is written to be QUOTED as fact, so it must earn that.`;
-    case "linkedin":
-    default:
-      return `PLATFORM: LinkedIn. 120-200 words. No hashtag spam (max 3, relevant).`;
-  }
-}
+/**
+ * Re-exported from the platform registry so existing importers keep working —
+ * src/platforms is now the single place a channel is defined.
+ */
+export type TargetPlatform = PlatformKey;
 
 /** §17.3 — Repurposing. */
 export function repurposePrompt(input: {
@@ -118,7 +85,7 @@ CREDIBILITY, not lead-gen.`;
   const user = `VOICE GUIDE: ${input.voiceGuide}
 TOPIC / ANGLE: ${input.angle}   PILLAR: ${input.pillar}
 SOURCE MATERIAL (the ONLY factual basis you may use): ${input.retrievedChunks}
-${platformSpec(input.platform ?? "linkedin")}
+${platformFor(input.platform ?? "linkedin").spec}
 ${extras}
 
 Write a post that:
@@ -146,14 +113,7 @@ export function reviewerPrompt(input: {
 }): { system: string; user: string } {
   const system = `You are Board Infinity's brand-safety and quality reviewer. You are strict.
 Review the draft against this checklist and BLOCK anything that fails.`;
-  const lengthCheck =
-    input.platform === "x"
-      ? "6. Is <=280 characters total (X's hard limit)."
-      : input.platform === "geo"
-        ? "6. Opens with a direct, complete answer to the target question in the first sentence; 150-400 words; every claim is independently checkable against the source — this will be quoted as fact."
-        : input.platform === "youtube"
-          ? "6. Has a TITLE, HOOK, numbered TALKING POINTS, and a CTA section; reads like something spoken aloud, not written prose; every talking point is grounded in the source material."
-          : "6. Fits the platform's length norm (roughly 120-200 words for LinkedIn, a short caption for Instagram).";
+  const lengthCheck = platformFor(input.platform ?? "linkedin").reviewCheck;
   const user = `DRAFT: ${input.draft}
 CLAIMS_USED: ${input.claimsUsed}   SOURCE MATERIAL: ${input.retrievedChunks}
 BANNED TOPICS: ${input.bannedTopics}   VOICE GUIDE: ${input.voiceGuide}
@@ -274,13 +234,12 @@ export function imagePrompt(input: {
   angle: string;
   pillar: string;
   visualNotes?: string | null;
-  platform?: "instagram" | "linkedin";
+  /** Shape of the image — comes from the channel's registry entry. */
+  aspect?: "square" | "landscape";
   variationHint?: string | null;
 }): string {
   const composition =
-    input.platform === "linkedin"
-      ? "Landscape 1.91:1 composition."
-      : "Square 1:1 composition.";
+    input.aspect === "landscape" ? "Landscape 1.91:1 composition." : "Square 1:1 composition.";
   return [
     "A professional, brand-safe visual for a B2B social media post.",
     `Topic: ${input.angle}.`,

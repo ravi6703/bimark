@@ -1,6 +1,7 @@
 import { getLlm, parseJson } from "../llm/index.js";
 import type { LlmProvider } from "../llm/types.js";
 import type { RetrievedChunk } from "../types.js";
+import { capForPlatform, platformFor } from "../platforms/index.js";
 import { PROMPT_VERSION, repurposePrompt, type TargetPlatform } from "./prompts.js";
 
 export interface RepurposeOutput {
@@ -62,19 +63,13 @@ export async function repurpose(
     "repurpose",
   );
   return {
-    // X has a hard 280-char limit Ayrshare will reject past — enforce it in
-    // code too, not just via the prompt, since LLMs occasionally overshoot.
-    body: platform === "x" ? hardTruncate(parsed.body, 280) : parsed.body,
+    // Enforced in code as well as in the prompt — see capForPlatform.
+    body: capForPlatform(platform, parsed.body),
     variants: parsed.variants ?? [],
     claims_used: parsed.claims_used ?? [],
     promptVersion: PROMPT_VERSION,
     modelUsed: res.modelUsed,
   };
-}
-
-function hardTruncate(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, maxChars - 1).trimEnd()}…`;
 }
 
 /** Deterministic offline draft grounded in the retrieved snippets. */
@@ -88,12 +83,11 @@ function mockDraft(
   claims_used: string[];
 } {
   const lead = chunks[0]?.chunk_text?.replace(/\s+/g, " ").slice(0, 180) ?? "";
-  const body =
-    platform === "x"
-      ? hardTruncate(`${angle}. ${lead}`, 280)
-      : `${angle}.\n\n${lead}\n\n` +
-        "The takeaway for anyone building employability at scale: ground the work in " +
-        "real outcomes, not slogans. That is how trust compounds.";
+  const body = platformFor(platform).maxChars
+    ? capForPlatform(platform, `${angle}. ${lead}`)
+    : `${angle}.\n\n${lead}\n\n` +
+      "The takeaway for anyone building employability at scale: ground the work in " +
+      "real outcomes, not slogans. That is how trust compounds.";
   return {
     body,
     variants: [`A sharper hook on: ${angle}`, `A data-led hook on: ${angle}`],

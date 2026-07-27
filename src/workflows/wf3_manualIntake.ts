@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { logger } from "../logger.js";
 import { campaigns, pillars, topics } from "../db/repositories/index.js";
+import { PLATFORM_KEYS, type PlatformKey } from "../platforms/index.js";
 import { runRepurposeReview } from "./wf4_repurposeReview.js";
 import type { Draft } from "../types.js";
 
@@ -16,7 +17,9 @@ import type { Draft } from "../types.js";
  * through the same brand-safety gate. `platform` (singular) is kept for
  * back-compat with earlier callers; `platforms` (plural) is preferred.
  */
-const PLATFORM = z.enum(["linkedin", "x", "instagram", "geo", "youtube"]);
+// Derived from the registry rather than restated — one channel list, in
+// src/platforms, so a new channel can't be accepted here but unknown there.
+const PLATFORM = z.enum(PLATFORM_KEYS as [PlatformKey, ...PlatformKey[]]);
 
 /** Structured per-platform guidance (§20) — mirrors src/types.ts#PlatformExtra. */
 const platformDetailsSchema = z.object({

@@ -3,6 +3,7 @@ import { logger } from "../logger.js";
 import { repurpose } from "../agents/repurpose.js";
 import { review } from "../agents/reviewer.js";
 import { DEFAULT_VOICE_GUIDE, imagePrompt, type TargetPlatform } from "../agents/prompts.js";
+import { platformFor, visualNotesFor } from "../platforms/index.js";
 import { brands, drafts, mediaAssets, ownedAssets, pillars, topics } from "../db/repositories/index.js";
 import { buildMediaUrl, getImageGenerator } from "../images/index.js";
 import { applyLogoWatermark } from "../images/watermark.js";
@@ -65,6 +66,7 @@ async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
   const bannedTopics = brand?.banned_topics ?? [];
   const pillarName = await resolvePillarName(topic);
   const platform = normalizePlatform(topic.platform);
+  const def = platformFor(platform);
 
   // Step 1 — gather grounding chunks (§16 WF-4.1).
   const { chunks, lowSource } = await gatherChunks(topic);
@@ -72,7 +74,7 @@ async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
   // Step 1b — fold structured per-platform guidance (§20) into the free-text
   // must-say the draft prompt already understands, rather than growing the
   // prompt builder's parameter list per platform.
-  const mustSay = [topic.must_say, extraGuidance(platform, topic.platform_extra)]
+  const mustSay = [topic.must_say, def.guidance(topic.platform_extra)]
     .filter(Boolean)
     .join(" ") || undefined;
 
@@ -167,26 +169,17 @@ async function generateForClaimedTopic(topic: Topic): Promise<Draft> {
     logger.warn({ err, draftId: draft.id }, "WF-4: distinctiveness check failed — proceeding without it");
   }
 
-  // Step 5b — Instagram can't post text-only (§20), so it always gets one
-  // auto-attached image. LinkedIn can't post text-only either in the sense
-  // that matters here — it CAN, but a multi-image post reads as a real
-  // carousel rather than a wall of text, so it gets its own small gallery
-  // (LinkedIn multi-image follow-up).
-  if (platform === "instagram") {
-    const visualStyle = (topic.platform_extra as InstagramExtra | null)?.visualStyle;
-    const visualNotes = [brand?.visual_notes, visualStyle ? `Visual style: ${visualStyle}.` : null]
-      .filter(Boolean)
-      .join(" ") || null;
-    await attachGeneratedImages(draft, 1, topic.angle ?? "", pillarName, visualNotes, "instagram", brand);
-  } else if (platform === "linkedin") {
-    const visualNotes = brand?.visual_notes ?? null;
+  // Step 5b — how many images this channel carries, and any channel-specific
+  // visual guidance, are the registry's business (src/platforms).
+  const imageCount = def.imageCount();
+  if (imageCount > 0) {
     await attachGeneratedImages(
       draft,
-      config.image.linkedinImageCount,
+      imageCount,
       topic.angle ?? "",
       pillarName,
-      visualNotes,
-      "linkedin",
+      visualNotesFor(platform, brand?.visual_notes, topic.platform_extra),
+      def.imageAspect,
       brand,
     );
   }
@@ -226,7 +219,7 @@ async function attachGeneratedImages(
   angle: string,
   pillarName: string,
   visualNotes: string | null,
-  platform: "instagram" | "linkedin",
+  aspect: "square" | "landscape",
   brand: Brand | null,
 ): Promise<void> {
   const logo = brand?.logo_data ? { mimeType: brand.logo_mime_type ?? "image/png", data: brand.logo_data } : null;
@@ -235,7 +228,7 @@ async function attachGeneratedImages(
     try {
       const variationHint =
         count > 1 ? `Image ${i + 1} of ${count}: a different visual angle/composition than the others, same topic and style.` : null;
-      const prompt = imagePrompt({ angle, pillar: pillarName, visualNotes, platform, variationHint });
+      const prompt = imagePrompt({ angle, pillar: pillarName, visualNotes, aspect, variationHint });
       let image = await getImageGenerator().generate(prompt);
       if (logo) {
         image = await applyLogoWatermark(image, logo);
@@ -259,18 +252,20 @@ async function attachGeneratedImages(
 }
 
 /**
- * Regenerate the attached image(s) for an Instagram or LinkedIn draft (audit
- * Phase 1 quick win, extended for LinkedIn multi-image) — previously a failed
- * generation was a dead end short of rejecting the whole draft, since the
- * only recourse was passing mediaUrls manually. Clears the draft's existing
- * images first so a LinkedIn regenerate replaces the whole set rather than
- * piling a second gallery on top of the first.
+ * Regenerate the attached image(s) for a draft (audit Phase 1 quick win,
+ * extended for LinkedIn multi-image) — previously a failed generation was a
+ * dead end short of rejecting the whole draft, since the only recourse was
+ * passing mediaUrls manually. Clears the draft's existing images first so a
+ * regenerate replaces the whole set rather than piling a second gallery on
+ * top of the first. Which channels carry images, how many, and what shape is
+ * the registry's call (src/platforms).
  */
 export async function regenerateDraftImage(draftId: number): Promise<Draft> {
   const draft = await drafts.get(draftId);
   if (!draft) throw new Error(`regenerateDraftImage: draft ${draftId} not found`);
-  if (draft.platform !== "instagram" && draft.platform !== "linkedin") {
-    throw new Error("regenerateDraftImage: only Instagram and LinkedIn drafts carry generated images");
+  const def = platformFor(draft.platform);
+  if (def.imageCount() < 1) {
+    throw new Error(`regenerateDraftImage: ${def.label} drafts don't carry generated images`);
   }
   const topic = await topics.get(draft.topic_id);
   if (!topic) throw new Error(`regenerateDraftImage: topic for draft ${draftId} not found`);
@@ -280,24 +275,15 @@ export async function regenerateDraftImage(draftId: number): Promise<Draft> {
   await mediaAssets.deleteForDraft(draftId);
   draft.media_asset_id = null;
 
-  if (draft.platform === "instagram") {
-    const visualStyle = (topic.platform_extra as InstagramExtra | null)?.visualStyle;
-    const visualNotes =
-      [brand?.visual_notes, visualStyle ? `Visual style: ${visualStyle}.` : null]
-        .filter(Boolean)
-        .join(" ") || null;
-    await attachGeneratedImages(draft, 1, topic.angle ?? "", pillarName, visualNotes, "instagram", brand);
-  } else {
-    await attachGeneratedImages(
-      draft,
-      config.image.linkedinImageCount,
-      topic.angle ?? "",
-      pillarName,
-      brand?.visual_notes ?? null,
-      "linkedin",
-      brand,
-    );
-  }
+  await attachGeneratedImages(
+    draft,
+    def.imageCount(),
+    topic.angle ?? "",
+    pillarName,
+    visualNotesFor(draft.platform, brand?.visual_notes, topic.platform_extra),
+    def.imageAspect,
+    brand,
+  );
 
   if (draft.media_asset_id == null) {
     throw new Error("Image generation failed again — check the image provider's credentials.");
@@ -311,60 +297,8 @@ async function resolvePillarName(topic: Topic): Promise<string> {
   return list.find((p) => p.id === topic.pillar_id)?.name ?? "";
 }
 
-const VALID_PLATFORMS = new Set<TargetPlatform>(["linkedin", "x", "instagram", "geo", "youtube"]);
 function normalizePlatform(p: string): TargetPlatform {
-  return VALID_PLATFORMS.has(p as TargetPlatform) ? (p as TargetPlatform) : "linkedin";
-}
-
-/**
- * Turns structured per-platform guidance (§20) into a plain-language
- * instruction the existing draft prompt already knows how to use (mustSay).
- * Instagram's visual style is handled separately — see attachGeneratedImages.
- */
-function extraGuidance(platform: TargetPlatform, extra: Topic["platform_extra"]): string | null {
-  if (!extra) return null;
-  if (platform === "linkedin") {
-    const { audience, cta } = extra as LinkedInExtra;
-    return (
-      [
-        audience ? `Write for this audience: ${audience}.` : "",
-        cta ? `End with this call to action: ${cta}.` : "",
-      ]
-        .filter(Boolean)
-        .join(" ") || null
-    );
-  }
-  if (platform === "x") {
-    const { angleStyle } = extra as XExtra;
-    switch (angleStyle) {
-      case "hot-take":
-        return "Take a provocative, opinionated stance — don't hedge.";
-      case "question":
-        return "Frame it as a genuine question to the audience, not a statement.";
-      case "informative":
-        return "Keep it purely informative — no hot take, no question, just the insight.";
-      default:
-        return null;
-    }
-  }
-  if (platform === "geo") {
-    const { targetQuestion } = extra as GeoExtra;
-    return targetQuestion ? `Directly answer this question: ${targetQuestion}` : null;
-  }
-  if (platform === "youtube") {
-    const { videoAngle } = extra as YoutubeExtra;
-    switch (videoAngle) {
-      case "tutorial":
-        return "Structure it as a step-by-step tutorial — numbered, actionable steps.";
-      case "explainer":
-        return "Structure it as a concept explainer — build understanding, not a how-to.";
-      case "interview-clip":
-        return "Write it as talking points for a short interview-style clip, not a monologue.";
-      default:
-        return null;
-    }
-  }
-  return null; // instagram's platform_extra is visual-only, applied to the image prompt
+  return platformFor(p).key;
 }
 
 /**
