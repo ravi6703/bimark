@@ -3,7 +3,9 @@ import { config } from "../src/config.js";
 import { closePool, query } from "../src/db/pool.js";
 import { migrate } from "../src/db/migrate.js";
 import { seed } from "../src/db/seed.js";
-import { brands, campaigns, topics } from "../src/db/repositories/index.js";
+import { brands, campaigns, channels, topics } from "../src/db/repositories/index.js";
+import { pickPitchPlatform } from "../src/workflows/wf1_morningPitch.js";
+import { queueManualIntake } from "../src/workflows/wf3_manualIntake.js";
 
 /**
  * Migration 015's backfill, exercised against a real Postgres. The backfill
@@ -140,6 +142,48 @@ d("migration 015: campaign backfill + repo", () => {
       "SELECT count(*)::int AS n FROM topics WHERE campaign_id IS NULL",
     );
     expect(rows[0]!.n).toBe(0);
+  });
+
+  it("intake writes one campaign for the idea and one topic per channel", async () => {
+    const { campaignId, queued } = await queueManualIntake({
+      brand_id: brandId,
+      topic: "One idea, three channels",
+      platforms: ["linkedin", "x", "instagram"],
+    });
+
+    expect(queued).toHaveLength(3);
+    for (const q of queued) {
+      expect((await topics.get(q.topicId))!.campaign_id).toBe(campaignId);
+    }
+
+    const campaign = await campaigns.get(campaignId, brandId);
+    expect(campaign!.title).toBe("One idea, three channels");
+    expect(campaign!.created_by).toBe("manual-intake");
+  });
+
+  it("the morning pitch targets the channel furthest behind its weekly target", async () => {
+    // Nothing has been published for this brand, so every channel is equally
+    // behind — the biggest weekly_target wins, and it is NOT LinkedIn, which
+    // is what the old code always silently defaulted to.
+    const existing = await channels.list(brandId);
+    const platforms = existing.map((c) => c.platform);
+    if (!platforms.includes("instagram")) {
+      await channels.create({
+        brand_id: brandId,
+        platform: "instagram",
+        weekly_target: 99, // far and away the largest deficit
+        allowed_media: ["image"],
+      });
+    }
+
+    expect(await pickPitchPlatform(brandId)).toBe("instagram");
+  });
+
+  it("pickPitchPlatform falls back to linkedin for a brand with no channel config", async () => {
+    const { rows } = await query<{ id: number }>(
+      "INSERT INTO brands (name, slug) VALUES ('No Channels Co', 'no-channels-co') RETURNING id",
+    );
+    expect(await pickPitchPlatform(rows[0]!.id)).toBe("linkedin");
   });
 
   it("listWithChannels returns each idea once, with its channels and draft state", async () => {

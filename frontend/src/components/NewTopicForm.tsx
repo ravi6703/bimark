@@ -145,7 +145,7 @@ export function NewTopicForm() {
       // own request, in parallel. Generation is tens of seconds per platform,
       // so doing them all in a single request used to hit the serverless
       // timeout as soon as more than a couple of platforms were selected.
-      const queued = await api.createTopic({
+      const { queued } = await api.createTopic({
         topic: topic.trim(),
         pillar: pillar || undefined,
         platforms,

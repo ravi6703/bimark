@@ -28,8 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = req.headers["x-brand-id"]
       ? { ...req.body, brand_id: await resolveBrandId(req) }
       : req.body;
-    const queued = await queueManualIntake(body);
-    res.status(202).json({ ok: true, queued });
+    const { campaignId, queued } = await queueManualIntake(body);
+    res.status(202).json({ ok: true, campaignId, queued });
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(400).json({ error: err.issues });

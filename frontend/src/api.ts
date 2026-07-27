@@ -235,6 +235,29 @@ export interface GeoCitationCheck {
   checked_at: string;
 }
 
+/**
+ * One content idea and the live state of every channel it went out on
+ * (migration 015). Replaces listing raw topics, where an idea targeting five
+ * platforms showed up five times with nothing tying the rows together.
+ */
+export interface Campaign {
+  id: number;
+  title: string;
+  pillar_id: number | null;
+  source: string | null;
+  why_now: string | null;
+  must_say: string | null;
+  created_by: string | null;
+  created_at: string;
+  channels: {
+    topicId: number;
+    platform: string;
+    status: string;
+    draftId: number | null;
+    draftStatus: string | null;
+  }[];
+}
+
 /** Technical SEO audit (Okara-comparison follow-up) — real, rule-based
  * checks against the brand's actual site, not an estimated score. */
 export interface SeoCheck {
@@ -481,12 +504,17 @@ export const api = {
     must_say?: string;
     why_now?: string;
     platformDetails?: PlatformDetails;
-  }): Promise<{ platform: string; topicId: number }[]> {
-    const { queued } = await request<{ queued: { platform: string; topicId: number }[] }>(
-      "/webhooks/manual-intake",
-      { method: "POST", body: JSON.stringify({ brand_id: 1, ...input }) },
-    );
-    return queued;
+  }): Promise<{ campaignId: number; queued: { platform: string; topicId: number }[] }> {
+    return request("/webhooks/manual-intake", {
+      method: "POST",
+      body: JSON.stringify({ brand_id: 1, ...input }),
+    });
+  },
+
+  /** Content ideas with each channel's live state (migration 015). */
+  async listCampaigns(): Promise<Campaign[]> {
+    const { campaigns } = await request<{ campaigns: Campaign[] }>("/campaigns");
+    return campaigns;
   },
 
   /** Generate the draft for one queued topic. Safe to retry — a failed

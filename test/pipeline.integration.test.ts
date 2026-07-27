@@ -115,13 +115,18 @@ d("end-to-end pipeline (§16 WF-1..WF-7)", () => {
   });
 
   it("WF-3 async intake: queueing does not generate, and each topic generates separately", async () => {
-    const queued = await queueManualIntake({
+    const { campaignId, queued } = await queueManualIntake({
       brand_id: brandId,
       topic: "What hiring managers actually check in a campus assessment",
       pillar: "Applied assessment",
       platforms: ["linkedin", "x", "geo"],
     });
     expect(queued).toHaveLength(3);
+    // All three channels hang off ONE idea, not three unrelated ones.
+    expect(campaignId).toBeGreaterThan(0);
+    for (const q of queued) {
+      expect((await topics.get(q.topicId))!.campaign_id).toBe(campaignId);
+    }
 
     // Nothing generated yet — that's the whole point: the request returns
     // before any LLM work happens, so N platforms can't blow the time budget.
@@ -144,16 +149,17 @@ d("end-to-end pipeline (§16 WF-1..WF-7)", () => {
   });
 
   it("WF-4: a topic already being generated can't be claimed twice", async () => {
-    const [queued] = await queueManualIntake({
+    const { queued } = await queueManualIntake({
       brand_id: brandId,
       topic: "Why structured interviews beat gut feel",
       pillar: "Applied assessment",
       platforms: ["linkedin"],
     });
+    const first = queued[0]!;
 
     // First claim wins and drafts; the second finds nothing left in `picked`.
-    await runRepurposeReview(queued!.topicId);
-    await expect(runRepurposeReview(queued!.topicId)).rejects.toBeInstanceOf(
+    await runRepurposeReview(first.topicId);
+    await expect(runRepurposeReview(first.topicId)).rejects.toBeInstanceOf(
       TopicAlreadyGeneratingError,
     );
   });
